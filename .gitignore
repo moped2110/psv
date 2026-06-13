@@ -17,6 +17,8 @@ build/
 CLAUDE.md
 # Personal quick-start with local machine paths — public guide is docs/SETUP-onchain.md
 START-HERE.md
+# Private working backlog — do not commit (run once: git rm --cached TODO.md)
+TODO.md
 # Internal strategy / raw test-idea analysis — sanitize before any public push
 docs/source-testcases.md
 docs/system-test-catalog.md
