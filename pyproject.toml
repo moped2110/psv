@@ -1,0 +1,55 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "psv"
+version = "0.0.1"
+description = "System-level verification harness for complete x402 payment systems (settlement, RPC, reconciliation, load)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Mario" }]
+keywords = ["x402", "payments", "system-test", "verification", "anvil", "eip-3009"]
+
+# Core stays dependency-light. The harness needs a chain + signing; the
+# reference SUT needs a web server. All are pinned as optional extras so the
+# pure-logic units (divergence detector, RPC message construction) import and
+# test without a chain present.
+dependencies = []
+
+[project.optional-dependencies]
+# Talk to a chain and sign EIP-3009 authorizations.
+chain = ["web3>=7.0", "eth-account>=0.13"]
+# Run the bundled reference system-under-test.
+sut = ["fastapi>=0.110", "uvicorn>=0.29", "httpx>=0.27"]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.10",
+    "httpx>=0.27",
+    "web3>=7.0",
+    "eth-account>=0.13",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/psv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "onchain: requires a running Anvil + deployed token (run on a dev machine, not in CI sandbox)",
+    "load: load/stress profiles — never in the standard CI run",
+]
+# Offline by default: the on-chain E2E and SC1 live tests are opt-in via `-m onchain`.
+addopts = "-m 'not onchain and not load'"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src/psv"]
+# Optional third-party libs without stubs — don't fail the strict run on them.
+[[tool.mypy.overrides]]
+module = ["web3.*", "eth_account.*", "eth_utils.*", "fastapi.*", "uvicorn.*"]
+ignore_missing_imports = true

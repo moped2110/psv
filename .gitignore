@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.pytest_cache/
+
+# Secrets / local config — never commit
+.env
+*.key
+
+# Agent configuration (internal working instructions — mirrors 01-x402-testsuite)
+CLAUDE.md
+# Personal quick-start with local machine paths — public guide is docs/SETUP-onchain.md
+START-HERE.md
+# Internal strategy / raw test-idea analysis — sanitize before any public push
+docs/source-testcases.md
+docs/system-test-catalog.md
+
+# Foundry
+onchain/out/
+onchain/cache/
+onchain/broadcast/
+
+# Anvil state dumps
+*.anvil
+anvil-state.json
