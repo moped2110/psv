@@ -7,13 +7,13 @@ A faithful miniature of a real x402 payment system:
     bit SC1 targets), and
   * only then unlocks the paid resource.
 
-Two further, deliberately configurable weaknesses let the harness exercise the
-other top-damage cases:
+Configurable weaknesses let the harness exercise the system-level damage cases:
   * **D3** - an internal ledger that can be backed up/restored, plus an optional
     ``reconcile`` job. With reconciliation off, a restore silently forgets
     payments that happened on-chain.
   * **G3** - a quote locks a price against a movable fair-value oracle. Without
     re-pricing at pay time, an unexpired quote is a free option.
+  * **I** - idempotency. Without it, re-paying a settled order re-submits on-chain.
 
 Run on a dev machine alongside Anvil (needs [sut] + [chain] extras). The harness
 talks to it solely over HTTP (or in-process), so any implementation can replace it.
@@ -53,6 +53,10 @@ class SutConfig:
     quote_ttl: int = 3600
     reprice_on_pay: bool = False
     reprice_tolerance: float = 0.02
+    # I-class - idempotent pay. Off by default: re-paying a settled order
+    # re-submits on-chain (the vulnerable system). On: re-pay is a no-op that
+    # returns the cached settlement.
+    idempotent_pay: bool = False
 
 
 @dataclass
@@ -67,6 +71,7 @@ class _Order:
     resource: str | None = None
     created_block: int = 0
     recovered: bool = False  # set by reconciliation
+    settle_attempts: int = 0  # how many times settlement was submitted on-chain
 
 
 @dataclass
@@ -118,6 +123,15 @@ class ReferenceSut:
         if order is None:
             return {"order_id": order_id, "settled": False, "reason": "unknown_order"}
 
+        # I-class - idempotency. A robust system never settles the same order twice;
+        # re-pay returns the cached result. The vulnerable default falls through and
+        # re-submits on-chain (wasting gas, and double-crediting in a naive ledger).
+        if order.paid and self.config.idempotent_pay:
+            return {
+                "order_id": order_id, "settled": True,
+                "submitted_tx": order.submitted_tx, "idempotent": True,
+            }
+
         # G3 guards - refuse to settle an expired or stale (under-priced) quote.
         now = int(time.time())
         if now > order.expires_at:
@@ -128,6 +142,7 @@ class ReferenceSut:
             return {"order_id": order_id, "settled": False, "reason": "stale_quote"}
 
         order.nonce_seen = str(authorization["nonce"])
+        order.settle_attempts += 1
         tx_hash = self._submit_settlement(authorization)
         order.submitted_tx = tx_hash
         self.rpc.wait_for_receipt(tx_hash)
