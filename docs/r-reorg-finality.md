@@ -47,6 +47,17 @@ silent **unpaid** (a false negative — the silent-loss class). The reference
 confirmer instead lets the error propagate (fail loud), and a unit test pins this
 behaviour (`test_confirmer_does_not_swallow_rpc_error_into_false_negative`).
 
+## A second timing trap: confirming before inclusion
+
+The mirror image of waiting too long is checking too **early**. A SUT that scans
+for the settlement event immediately after submitting — before the tx is mined —
+sees nothing and concludes "unpaid", a false negative. With Anvil's automine
+paused (`set_automine(False)`), the harness reproduces this deterministically:
+submit while mining is paused, observe the premature "unpaid", then mine and show
+the payment really went through. The SUT still believes unpaid → the divergence
+detector raises a **silent loss** (`tests/test_settlement_delay.py`). The defense
+is to wait for inclusion (and ideally `N` confirmations) before deciding.
+
 ## Defenses `psv` can verify
 
 - **Finality by confirmations:** treat a settlement as final only at

@@ -8,12 +8,10 @@ A faithful miniature of a real x402 payment system:
   * only then unlocks the paid resource.
 
 Configurable weaknesses let the harness exercise the system-level damage cases:
-  * **D3** - an internal ledger that can be backed up/restored, plus an optional
-    ``reconcile`` job. With reconciliation off, a restore silently forgets
-    payments that happened on-chain.
-  * **G3** - a quote locks a price against a movable fair-value oracle. Without
-    re-pricing at pay time, an unexpired quote is a free option.
-  * **I** - idempotency. Without it, re-paying a settled order re-submits on-chain.
+  * **D3** - ledger backup/restore + optional ``reconcile`` job (silent loss on restore).
+  * **G3** - a quote locks a price against a movable fair-value oracle (free option).
+  * **I**  - idempotency: without it, re-paying a settled order re-submits on-chain.
+  * **delay** - confirming a settlement before it is mined yields a false negative.
 
 Run on a dev machine alongside Anvil (needs [sut] + [chain] extras). The harness
 talks to it solely over HTTP (or in-process), so any implementation can replace it.
@@ -54,9 +52,12 @@ class SutConfig:
     reprice_on_pay: bool = False
     reprice_tolerance: float = 0.02
     # I-class - idempotent pay. Off by default: re-paying a settled order
-    # re-submits on-chain (the vulnerable system). On: re-pay is a no-op that
-    # returns the cached settlement.
+    # re-submits on-chain (vulnerable). On: re-pay returns the cached settlement.
     idempotent_pay: bool = False
+    # Settlement-delay handling. Off by default the SUT waits for the settlement
+    # tx to be mined before confirming. On (vulnerable) it checks the event
+    # immediately, so a not-yet-mined settlement looks unpaid (false negative).
+    confirm_without_waiting: bool = False
 
 
 @dataclass
@@ -145,7 +146,10 @@ class ReferenceSut:
         order.settle_attempts += 1
         tx_hash = self._submit_settlement(authorization)
         order.submitted_tx = tx_hash
-        self.rpc.wait_for_receipt(tx_hash)
+        # Wait for the settlement to be mined before confirming. Skipping this
+        # (the vulnerable mode) checks too early and reports a false "unpaid".
+        if not self.config.confirm_without_waiting:
+            self.rpc.wait_for_receipt(tx_hash)
         # Confirm by watching the legacy Transfer event - the SC1-vulnerable step.
         settled = self.confirmer.is_settled(
             token=self.config.token_address,
