@@ -1,15 +1,14 @@
 """Chain-truth oracle + on-chain helpers for the UpgradeableMockUSDC token.
 
 This module is the harness's **independent source of truth**. It reads the chain
-directly — balances, the EIP-3009 nonce state, and the drift-proof
-``AuthorizationUsed`` event — to establish what *actually* happened on-chain,
+directly - balances, the EIP-3009 nonce state, and the drift-proof
+``AuthorizationUsed`` event - to establish what *actually* happened on-chain,
 without trusting the SUT or the facilitator.
 
-Crucially, settlement truth is derived from ``AuthorizationUsed(authorizer,
-nonce)`` and the balance delta, **not** from the ``Transfer`` event. That is the
-whole point of SC1: the ``Transfer`` event signature can drift (topic0 changes),
-blinding a system that watches it — but ``AuthorizationUsed`` and balances do
-not, so the oracle stays correct and can *expose* the SUT's blindness.
+Settlement truth is derived from ``AuthorizationUsed(authorizer, nonce)`` and the
+balance delta, **not** from the ``Transfer`` event - the whole point of SC1 is
+that the ``Transfer`` event signature can drift, blinding a system that watches
+it, while ``AuthorizationUsed`` and balances do not.
 
 ABI encoding is done by hand (fixed-width slots) to keep the core dependency on
 ``web3`` optional and the logic unit-testable against a fake transport.
@@ -26,6 +25,7 @@ SEL_BALANCE_OF = "70a08231"
 SEL_AUTHORIZATION_STATE = "e94a0102"
 SEL_TRANSFER_WITH_AUTHORIZATION = "cf092995"
 SEL_SET_EVENT_MODE = "2a030f44"
+SEL_SET_FEE_BPS = "023b1fc9"
 SEL_MINT = "40c10f19"
 SEL_EVENT_MODE = "0ce978e2"
 
@@ -115,6 +115,9 @@ class TokenView:
 
     def set_event_mode_calldata(self, mode: int) -> str:
         return "0x" + SEL_SET_EVENT_MODE + _slot_uint(mode)
+
+    def set_fee_bps_calldata(self, bps: int) -> str:
+        return "0x" + SEL_SET_FEE_BPS + _slot_uint(bps)
 
     def mint_calldata(self, to: str, amount: int) -> str:
         return "0x" + SEL_MINT + _slot_addr(to) + _slot_uint(amount)

@@ -55,6 +55,13 @@ harness — none are visible to black-box conformance:
   chain reorg (funds + nonce return) while the system still believes it paid →
   **phantom credit**; the defense is finality-by-confirmations.
   [`docs/r-reorg-finality.md`](docs/r-reorg-finality.md)
+- **T — token quirks (Phase 3).** Wrong-decimals assumptions mis-charge; a
+  fee-on-transfer token emits a gross event while crediting net, so confirming on
+  the event (not the received delta) is silently underpaid.
+  [`docs/t-token-quirks.md`](docs/t-token-quirks.md)
+- **C0 / N10 — security (Phase 4).** Cross-chain signature replay (domain binds
+  `chainId`) and fake-token/whitelist bypass (scope verification to the expected
+  asset). [`docs/c-security-gametheory.md`](docs/c-security-gametheory.md)
 
 ## Install
 

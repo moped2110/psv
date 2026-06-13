@@ -1,30 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-/// @title UpgradeableMockUSDC — a faithful EIP-3009 token that can change its
-///        settlement event signature IN PLACE, to reproduce SC1 (ABI / event drift).
+/// @title UpgradeableMockUSDC — a faithful EIP-3009 token with configurable quirks
+///        for system-level payment verification.
 ///
-/// @notice Identical settlement semantics to MockUSDC (on-chain EIP-712 signature
-///         verification + per-authorizer nonce tracking), but with an admin switch
-///         ``eventMode`` that changes WHICH event a settlement emits:
+/// @notice Same settlement semantics as a real EIP-3009 token (on-chain EIP-712
+///         signature verification + per-authorizer nonce tracking), plus two admin
+///         switches the harness uses to reproduce damage cases:
+///           - ``eventMode``: 0 = legacy Transfer(address,address,uint256),
+///             1 = drifted TransferV2(address,address,uint256,bytes32). Different
+///             topic0 → an event-watching indexer goes blind (SC1, ABI drift).
+///           - ``feeBps``: fee-on-transfer in basis points. The recipient NETS
+///             value*(1 - feeBps/10000) while the Transfer event still reports the
+///             GROSS value — the trap that fools amount-from-event checks (T-class).
 ///
-///           - mode 0 (LEGACY): emits  Transfer(address,address,uint256)
-///           - mode 1 (DRIFTED): emits  TransferV2(address,address,uint256,bytes32)
+/// The EIP-712 domain (name="USDC", version="2", chainId=block.chainid) binds the
+/// signature to the chain, so an authorization signed for another chain reverts
+/// here (C0, cross-chain replay defense).
 ///
-///         topic0 = keccak256 of the event signature, so the two events have
-///         DIFFERENT topic0. A payment system that confirms settlement by scanning
-///         for the legacy ``Transfer`` topic0 goes BLIND the moment mode flips —
-///         even though funds move identically on-chain. Same contract address,
-///         same storage, same balances: this is a real in-place upgrade, not a
-///         redeploy, which is exactly the SC1 failure mode (a proxy upgrade that
-///         silently changes the event a downstream indexer relies on).
-///
-/// The EIP-712 domain (name="USDC", version="2") is UNCHANGED across the flip, so
-/// off-chain signatures stay valid — the drift is purely in the emitted event,
-/// mirroring an upgrade that touched logs but not the signing domain.
-///
-/// No external imports → deploys with a single `forge create`.
-/// Run Anvil with `--chain-id 84532` to match eip155:84532 off-chain signing.
+/// No external imports → deploys with a single `forge create`. Run Anvil with
+/// `--chain-id 84532` to match eip155:84532 off-chain signing.
 contract UpgradeableMockUSDC {
     string public constant name = "USDC";
     string public constant version = "2";
@@ -37,6 +32,8 @@ contract UpgradeableMockUSDC {
 
     /// @notice 0 = legacy Transfer event, 1 = drifted TransferV2 event.
     uint8 public eventMode;
+    /// @notice Fee-on-transfer in basis points (0 = none).
+    uint16 public feeBps;
     address public admin;
 
     bytes32 public constant TRANSFER_WITH_AUTHORIZATION_TYPEHASH = keccak256(
@@ -52,6 +49,7 @@ contract UpgradeableMockUSDC {
     event TransferV2(address indexed from, address indexed to, uint256 value, bytes32 ref);
     event AuthorizationUsed(address indexed authorizer, bytes32 indexed nonce);
     event EventModeChanged(uint8 previousMode, uint8 newMode);
+    event FeeBpsChanged(uint16 previousBps, uint16 newBps);
 
     constructor() {
         admin = msg.sender;
@@ -65,8 +63,16 @@ contract UpgradeableMockUSDC {
         eventMode = mode;
     }
 
+    /// @notice Turn on fee-on-transfer (basis points). Capped at 10% for tests.
+    function setFeeBps(uint16 bps) external {
+        require(msg.sender == admin, "only admin");
+        require(bps <= 1000, "fee too high");
+        emit FeeBpsChanged(feeBps, bps);
+        feeBps = bps;
+    }
+
     /// @notice Open mint for testing. Always emits legacy Transfer (minting is not
-    ///         the path under test); SC1 concerns the SETTLEMENT event only.
+    ///         the path under test).
     function mint(address to, uint256 amount) external {
         balanceOf[to] += amount;
         totalSupply += amount;
@@ -108,8 +114,16 @@ contract UpgradeableMockUSDC {
 
         authorizationState[from][nonce] = true; // mark before transfer (replay safety)
         require(balanceOf[from] >= value, "insufficient balance");
+
+        // Fee-on-transfer: the payer is debited `value`, but the recipient nets
+        // `value - fee` (the fee is parked with admin). The Transfer event below
+        // still reports the GROSS `value` — the trap that fools event-amount checks.
+        uint256 fee = (value * feeBps) / 10000;
         balanceOf[from] -= value;
-        balanceOf[to] += value;
+        balanceOf[to] += value - fee;
+        if (fee > 0) {
+            balanceOf[admin] += fee;
+        }
         emit AuthorizationUsed(from, nonce);
 
         // The drift: identical fund movement, different settlement event.
