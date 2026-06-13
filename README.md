@@ -51,6 +51,10 @@ harness — none are visible to black-box conformance:
 - **G3 — quote as a free option.** A locked quote honored after the fair value
   moves is a free call option; a re-pricing guard rejects stale quotes before
   settlement. [`docs/g3-quote-option.md`](docs/g3-quote-option.md)
+- **R — reorg invalidation (Phase 2).** A settled, booked payment is undone by a
+  chain reorg (funds + nonce return) while the system still believes it paid →
+  **phantom credit**; the defense is finality-by-confirmations.
+  [`docs/r-reorg-finality.md`](docs/r-reorg-finality.md)
 
 ## Install
 
