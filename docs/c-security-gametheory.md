@@ -28,8 +28,18 @@ to the merchant, and — if the system scans events without scoping by token add
 reference confirmer already scopes its `eth_getLogs` to the configured token
 address, so a fake-token transfer is ignored. (Offline: `tests/test_security_unit.py`.)
 
+## N15 — Session / order-id predictability
+
+If order ids are sequential or short (`ord_1`, `ord_42`), an attacker enumerates
+them and tries to claim another customer's paid resource. Ids must carry enough
+unpredictable entropy. `psv.security_checks.sufficient_id_entropy` checks the
+non-prefix body is high-entropy hex; the reference SUT uses `secrets.token_hex(8)`
+(16 hex chars) and passes, while sequential schemes fail. (Offline:
+`tests/test_session_unit.py`.)
+
 ## Defenses `psv` can verify
 
+- Issue **unguessable** order/session ids (≥ 64 bits of entropy); never sequential.
 - Verify the authorization's EIP-712 **domain chainId** equals the system's chain
   before submitting (and rely on the token's on-chain domain binding as backstop).
 - Scope settlement verification to the **exact asset contract address**; maintain

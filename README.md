@@ -59,9 +59,14 @@ harness — none are visible to black-box conformance:
   fee-on-transfer token emits a gross event while crediting net, so confirming on
   the event (not the received delta) is silently underpaid.
   [`docs/t-token-quirks.md`](docs/t-token-quirks.md)
-- **C0 / N10 — security (Phase 4).** Cross-chain signature replay (domain binds
-  `chainId`) and fake-token/whitelist bypass (scope verification to the expected
-  asset). [`docs/c-security-gametheory.md`](docs/c-security-gametheory.md)
+- **C0 / N10 / N15 — security (Phase 4).** Cross-chain signature replay (domain
+  binds `chainId`), fake-token/whitelist bypass (scope verification to the expected
+  asset), and order-id predictability (unguessable session ids).
+  [`docs/c-security-gametheory.md`](docs/c-security-gametheory.md)
+- **Load profiles (Phase 5).** `psv.load.run_profile` drives a target
+  concurrently and reports throughput + latency percentiles while asserting
+  correctness under load (every payment settles exactly once). Behind the `load`
+  marker (`pytest -m load`), out of the default run.
 
 ## Install
 
