@@ -1,6 +1,6 @@
 # C / N — Security & game-theory at the system level (Phase 4)
 
-**Status:** C0 reproduced offline + on-chain; N10, N15, N16 reproduced offline.
+**Status:** C0 + N16 reproduced offline + on-chain; N10, N15 reproduced offline.
 
 ## C0 — Cross-chain signature replay
 
@@ -54,7 +54,9 @@ result with no bytecode → reject the asset before verifying the signature or
 settling. This mirrors the x402 SDK's `asset_not_deployed_contract` check
 (upstream x402#2554), which added exactly this pre-flight to the EVM facilitator's
 `verify` for EIP-3009, Permit2 exact, and Permit2 upto. (Offline:
-`tests/test_eoa_asset_unit.py`.)
+`tests/test_eoa_asset_unit.py`; on-chain: `tests/test_n16_eoa_asset_silent_noop.py`
+— sends the settle calldata to an Anvil EOA, confirms the tx succeeds with status 1
+yet moves nothing and emits no log, and that `eth_getCode` separates it from the token.)
 
 ## Defenses `psv` can verify
 

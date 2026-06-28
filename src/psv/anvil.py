@@ -121,6 +121,14 @@ class RpcClient:
     def eth_call(self, to: str, data: str, block: str = "latest") -> str:
         return str(self.call("eth_call", [{"to": to, "data": data}, block]))
 
+    def get_code(self, address: str, block: str = "latest") -> str:
+        """``eth_getCode``: deployed bytecode at ``address`` (``"0x"`` for an EOA).
+
+        The pre-flight that distinguishes a real token from a wallet address: an
+        EOA has no code, so a settlement against it is a silent no-op (x402#2554).
+        """
+        return str(self.call("eth_getCode", [address, block]))
+
     def send_raw_transaction(self, raw: str) -> str:
         return str(self.call("eth_sendRawTransaction", [raw]))
 

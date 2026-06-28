@@ -9,6 +9,9 @@ moved -> PHANTOM_CREDIT).
 
 from __future__ import annotations
 
+from typing import Any
+
+from psv.anvil import RpcClient
 from psv.chain import SettlementTruth
 from psv.security_checks import asset_is_deployed_contract
 
@@ -32,3 +35,19 @@ def test_eoa_settlement_is_a_phantom_credit() -> None:
         payer_delta=0, payee_delta=0,
     )
     assert truth.funds_moved is False  # SUT-believed payment is a phantom credit
+
+
+def test_get_code_helper_feeds_the_guard() -> None:
+    # The RpcClient.get_code result flows straight into the guard. Use the
+    # injectable transport so this stays a pure offline unit test.
+    def fake(req: dict[str, Any]) -> dict[str, Any]:
+        return {"jsonrpc": "2.0", "id": req["id"], "result": "0x60806040"}
+
+    rpc = RpcClient(transport=fake)
+    assert rpc.get_code("0xcontract") == "0x60806040"
+    assert asset_is_deployed_contract(rpc.get_code("0xcontract")) is True
+
+    def empty(req: dict[str, Any]) -> dict[str, Any]:
+        return {"jsonrpc": "2.0", "id": req["id"], "result": "0x"}
+
+    assert asset_is_deployed_contract(RpcClient(transport=empty).get_code("0xeoa")) is False
