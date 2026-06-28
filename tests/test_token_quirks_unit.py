@@ -35,6 +35,14 @@ def test_to_atomic_rejects_unrepresentable() -> None:
         to_atomic("0.0000001", 6)  # 7 dp at 6 decimals -> not representable
 
 
+def test_negative_decimals_rejected() -> None:
+    # A nonsensical decimals value must fail loudly, not silently produce garbage.
+    with pytest.raises(ValueError):
+        to_atomic("1", -1)
+    with pytest.raises(ValueError):
+        from_atomic(1, -1)
+
+
 def test_net_after_fee() -> None:
     assert net_after_fee(10_000, 0) == 10_000
     assert net_after_fee(10_000, 200) == 9_800  # 2%

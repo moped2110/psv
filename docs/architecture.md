@@ -31,7 +31,13 @@ ground truth*.
 | `psv.payloads` | EIP-3009 `TransferWithAuthorization` signing (independent of any x402 SDK). |
 | `psv.sut` | `SutAdapter` ABC + `HttpSutAdapter`. The contract every SUT must satisfy: `quote` / `pay` / `status`. |
 | `psv.reference_sut` | A bundled, faithful SUT used to exercise the harness. Settlement is confirmed by **watching the `Transfer` event** — deliberately the SC1-vulnerable pattern. |
-| `psv.divergence` | Compares ground truth to SUT belief → `Divergence` (kind + severity). |
+| `psv.divergence` | Compares ground truth to SUT belief → `Divergence` (`silent_loss` / `phantom_credit` / consistent, + severity). |
+| `psv.reorg` | Reorg/finality math: a payment settled then invalidated by a shallow reorg → `phantom_credit`. (`docs/r-reorg-finality.md`) |
+| `psv.token_quirks` | Decimals (fail-loud) + fee-on-transfer: verify on the merchant's **net balance delta**, not the gross `Transfer` event. (`docs/t-token-quirks.md`) |
+| `psv.security_checks` | Game-theory guards: cross-chain replay binding (C0), asset-scoping / fake-token (N10), order-id entropy (N15), EOA-asset `eth_getCode` pre-flight (N16). (`docs/c-security-gametheory.md`) |
+| `psv.reconciliation` | Backup/restore ledger reconciliation: chain `Transfer`-log diff vs the system ledger → unreconciled credits (D3). (`docs/d3-reconciliation.md`) |
+| `psv.quote_option` | Quote-as-free-option: stale-quote value + reprice guard (G3). (`docs/g3-quote-option.md`) |
+| `psv.load` | Throughput/latency profiling (`run_profile`): p50/p95/max, error rate, throughput. |
 
 ## The SUT adapter contract
 
@@ -71,7 +77,19 @@ Anvil. On-chain tests (`-m onchain`) add the real end-to-end confirmation.
 
 ## Phasing
 
-Phase 0 (this foundation) delivers the harness, the reference SUT, a green
-happy-path, and the first high-damage case (SC1). Later phases add fault
-tolerance & settlement edge cases, multi-token quirks, security/game-theory, and
-load — each gated behind markers so the default run stays fast and chain-free.
+Each phase is gated behind pytest markers so the default run stays fast and
+chain-free; `-m onchain` / `-m load` add the real end-to-end confirmations.
+
+- **Phase 0 — foundation.** Harness, reference SUT, green happy-path, and the
+  first high-damage case: SC1 (event/ABI drift → `silent_loss`).
+- **Phase 1 — fault tolerance & settlement edges.** Reorg/finality (R), idempotency
+  / exactly-once (re-paid order must settle once), premature-confirmation delay.
+- **Phase 2 — reconciliation & quote option.** Backup/restore ledger diff (D3),
+  quote-as-free-option reprice guard (G3).
+- **Phase 3 — multi-token quirks.** Decimals + fee-on-transfer (T).
+- **Phase 4 — security / game-theory.** Cross-chain replay (C0), fake-token /
+  asset-scoping (N10), order-id entropy (N15), EOA-asset silent no-op (N16).
+- **Phase 5 — load.** Throughput / latency profiling.
+
+All cases are reproduced offline (decision logic) and, where they touch the chain,
+confirmed on-chain against Anvil.
