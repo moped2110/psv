@@ -1,6 +1,6 @@
 # C / N — Security & game-theory at the system level (Phase 4)
 
-**Status:** C0 reproduced offline + on-chain; N10 reproduced offline.
+**Status:** C0 reproduced offline + on-chain; N10, N15, N16 reproduced offline.
 
 ## C0 — Cross-chain signature replay
 
@@ -37,6 +37,25 @@ non-prefix body is high-entropy hex; the reference SUT uses `secrets.token_hex(8
 (16 hex chars) and passes, while sequential schemes fail. (Offline:
 `tests/test_session_unit.py`.)
 
+## N16 — Asset is an EOA (silent no-op / payment bypass)
+
+A close cousin of N10, but more insidious. The EVM does **not** revert when a
+function is called on an address with no contract code: `eth_call` returns empty
+data and an on-chain `transferWithAuthorization` against an EOA "succeeds" —
+status 1 — while moving nothing and emitting no `Transfer`. A system that points
+its `asset` at (or accepts a payment claiming) an EOA, and skips an `eth_getCode`
+pre-flight, settles a **silent no-op**: it believes it was paid, the chain shows
+nothing moved. The harness's independent oracle catches it — `SettlementTruth.funds_moved`
+is `False` (no nonce burned, no balance delta) while the SUT reports success: a
+PHANTOM_CREDIT divergence.
+
+`psv.security_checks.asset_is_deployed_contract` is the guard: an `eth_getCode`
+result with no bytecode → reject the asset before verifying the signature or
+settling. This mirrors the x402 SDK's `asset_not_deployed_contract` check
+(upstream x402#2554), which added exactly this pre-flight to the EVM facilitator's
+`verify` for EIP-3009, Permit2 exact, and Permit2 upto. (Offline:
+`tests/test_eoa_asset_unit.py`.)
+
 ## Defenses `psv` can verify
 
 - Issue **unguessable** order/session ids (≥ 64 bits of entropy); never sequential.
@@ -44,5 +63,8 @@ non-prefix body is high-entropy hex; the reference SUT uses `secrets.token_hex(8
   before submitting (and rely on the token's on-chain domain binding as backstop).
 - Scope settlement verification to the **exact asset contract address**; maintain
   an allow-list of accepted tokens.
+- **Pre-flight `eth_getCode` on the asset**: reject an asset with no bytecode (an
+  EOA) before settling — a call to an EOA never reverts, so settlement would be a
+  silent no-op.
 - Treat the claimed payer address as untrusted until the signature recovers to it
   under the correct domain.

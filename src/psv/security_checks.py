@@ -92,3 +92,19 @@ def sufficient_id_entropy(order_id: str, *, prefix: str = "ord_", min_random_hex
     """
     body = order_id[len(prefix):] if order_id.startswith(prefix) else order_id
     return len(body) >= min_random_hex and bool(_HEX_RE.match(body))
+
+
+def asset_is_deployed_contract(code: str) -> bool:
+    """True iff ``code`` (an ``eth_getCode`` result) is non-empty deployed bytecode.
+
+    The EVM does not revert when a function is called on an address with no code
+    (an EOA): ``eth_call`` returns empty data and an on-chain
+    ``transferWithAuthorization`` is a *silent no-op* - it "succeeds" but moves
+    nothing and emits no ``Transfer``. A system that settles against such an asset
+    believes it was paid while the chain shows nothing moved - a PHANTOM_CREDIT
+    divergence. The robust guard is a pre-flight ``eth_getCode`` on the asset:
+    empty bytecode -> reject the asset before signature verification or settlement.
+    Mirrors the x402 SDK's ``asset_not_deployed_contract`` check (x402#2554).
+    """
+    stripped = code.lower().removeprefix("0x")
+    return len(stripped) > 0 and any(c != "0" for c in stripped)
