@@ -21,6 +21,9 @@ from .chain import SettlementTruth
 
 
 class DivergenceKind(str, Enum):
+    """The four ways chain truth and SUT belief can line up. The two consistent
+    cases are healthy; the two asymmetric ones are the bugs worth money."""
+
     CONSISTENT_PAID = "consistent_paid"
     CONSISTENT_UNPAID = "consistent_unpaid"
     SILENT_LOSS = "silent_loss"  # funds moved on-chain, SUT believes unpaid
@@ -28,12 +31,17 @@ class DivergenceKind(str, Enum):
 
 
 class Severity(str, Enum):
+    """Whether a divergence is benign (OK) or a money/security bug (CRITICAL)."""
+
     OK = "ok"
     CRITICAL = "critical"
 
 
 @dataclass
 class Divergence:
+    """The graded verdict for one payment: which `kind` of (mis)match, how bad,
+    and a human-readable explanation. `is_failure` is the gate for tests."""
+
     kind: DivergenceKind
     severity: Severity
     message: str

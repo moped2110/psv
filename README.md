@@ -59,14 +59,21 @@ harness — none are visible to black-box conformance:
   fee-on-transfer token emits a gross event while crediting net, so confirming on
   the event (not the received delta) is silently underpaid.
   [`docs/t-token-quirks.md`](docs/t-token-quirks.md)
-- **C0 / N10 / N15 — security (Phase 4).** Cross-chain signature replay (domain
+- **C0 / N10 / N15 / N16 — security (Phase 4).** Cross-chain signature replay (domain
   binds `chainId`), fake-token/whitelist bypass (scope verification to the expected
-  asset), and order-id predictability (unguessable session ids).
+  asset), order-id predictability (unguessable session ids), and asset-is-an-EOA
+  (a `transferWithAuthorization` to a code-less address is a silent no-op — settle
+  "succeeds" without moving funds; `eth_getCode` separates an EOA from a token).
   [`docs/c-security-gametheory.md`](docs/c-security-gametheory.md)
 - **Load profiles (Phase 5).** `psv.load.run_profile` drives a target
   concurrently and reports throughput + latency percentiles while asserting
   correctness under load (every payment settles exactly once). Behind the `load`
   marker (`pytest -m load`), out of the default run.
+- **Multi-asset rails (read-only).** `psv.rails` carries a small registry of real
+  rails (USDC on Base, JPYC on Polygon, EURC on Base — the MiCA EUR rail) and a
+  `reconcile_live` path that reads `balanceOf` + `authorizationState` and grades
+  divergence against the chain. Strictly read-only: it never signs or settles, so
+  it can run against a live chain without moving funds. [`docs/rails.md`](docs/rails.md)
 
 ## Install
 
