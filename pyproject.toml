@@ -18,6 +18,10 @@ keywords = ["x402", "payments", "system-test", "verification", "anvil", "eip-300
 # test without a chain present.
 dependencies = []
 
+# Read-only reconciliation CLI (stdlib only — no extra deps).
+[project.scripts]
+psv = "psv.cli:main"
+
 [project.optional-dependencies]
 # Talk to a chain and sign EIP-3009 authorizations.
 chain = ["web3>=7.0", "eth-account>=0.13"]
