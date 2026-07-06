@@ -57,8 +57,11 @@ markers = [
 addopts = "-m 'not onchain and not load'"
 filterwarnings = [
     # starlette's TestClient warns that its httpx integration is deprecated (wants
-    # httpx2). It's a third-party deprecation we don't control; silence just this one.
-    "ignore:Using httpx with starlette.testclient is deprecated:DeprecationWarning",
+    # httpx2). Third-party deprecation we don't control; silence just this one.
+    # Message is regex (re.match): the real text has backticks around `httpx` /
+    # `starlette.testclient`, so match loosely and drop the category (defaults to
+    # Warning, which covers StarletteDeprecationWarning).
+    'ignore:Using .*starlette.testclient.* is deprecated',
 ]
 
 [tool.mypy]
