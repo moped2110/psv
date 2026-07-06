@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_RPC, DEFAULT_TOKEN, send_tx
 
 from psv.chain import TokenView
 from psv.divergence import (
@@ -26,8 +27,6 @@ from psv.divergence import (
 )
 from psv.payloads import Authorization, EvmSigner, sign_authorization
 from psv.reference_sut.server import ReferenceSut, SutConfig
-
-from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_RPC, DEFAULT_TOKEN, send_tx
 
 pytestmark = pytest.mark.onchain
 
@@ -45,22 +44,30 @@ def _sut(*, reconciliation: bool) -> ReferenceSut:
     )
 
 
-def _pay(sut: ReferenceSut, token: TokenView, payer: EvmSigner, merchant: str) -> tuple[str, Authorization, Any]:
+def _pay(
+    sut: ReferenceSut, token: TokenView, payer: EvmSigner, merchant: str
+) -> tuple[str, Authorization, Any]:
     quote = sut.quote()
     amount = int(quote["amount"])
     payer_before = token.balance_of(payer.address)
     merchant_before = token.balance_of(merchant)
     auth = sign_authorization(
-        signer=payer, to=merchant, value=amount,
-        chain_id=DEFAULT_CHAIN_ID, token_address=DEFAULT_TOKEN,
-        token_name="USDC", token_version="2",
+        signer=payer,
+        to=merchant,
+        value=amount,
+        chain_id=DEFAULT_CHAIN_ID,
+        token_address=DEFAULT_TOKEN,
+        token_name="USDC",
+        token_version="2",
     )
     result = sut.pay(quote["order_id"], auth.as_dict())
     assert result["settled"] is True
     truth = settlement_truth_from_balances(
         nonce_consumed=token.authorization_used(payer.address, auth.nonce),
-        payer_before=payer_before, payer_after=token.balance_of(payer.address),
-        payee_before=merchant_before, payee_after=token.balance_of(merchant),
+        payer_before=payer_before,
+        payer_after=token.balance_of(payer.address),
+        payee_before=merchant_before,
+        payee_after=token.balance_of(merchant),
     )
     return quote["order_id"], auth, truth
 
@@ -69,8 +76,13 @@ def test_d3_restore_causes_silent_loss_caught_by_reconciliation(
     rpc: Any, funded_token: TokenView
 ) -> None:
     token = funded_token
-    send_tx(rpc, ANVIL_ACCOUNTS["deployer"][1], DEFAULT_TOKEN,
-            token.set_event_mode_calldata(0), DEFAULT_CHAIN_ID)
+    send_tx(
+        rpc,
+        ANVIL_ACCOUNTS["deployer"][1],
+        DEFAULT_TOKEN,
+        token.set_event_mode_calldata(0),
+        DEFAULT_CHAIN_ID,
+    )
     payer = EvmSigner.from_key(ANVIL_ACCOUNTS["payer"][1])
     merchant = ANVIL_ACCOUNTS["merchant"][0]
 

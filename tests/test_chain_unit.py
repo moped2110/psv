@@ -45,17 +45,22 @@ def test_settle_calldata_structure() -> None:
     token = TokenView(_rpc_returning("0x"), TOKEN)
     sig = "0x" + "11" * 65  # 65-byte signature
     data = token.settle_calldata(
-        from_addr=ADDR, to=TOKEN, value=10_000,
-        valid_after=0, valid_before=2**48, nonce="0x" + "cd" * 32, signature=sig,
+        from_addr=ADDR,
+        to=TOKEN,
+        value=10_000,
+        valid_after=0,
+        valid_before=2**48,
+        nonce="0x" + "cd" * 32,
+        signature=sig,
     )
     body = data.removeprefix("0x")
     assert body[:8] == SEL_TRANSFER_WITH_AUTHORIZATION
     # 7 head words after the selector, then the bytes offset must point past them.
-    offset_word = body[8 + 6 * 64: 8 + 7 * 64]
+    offset_word = body[8 + 6 * 64 : 8 + 7 * 64]
     assert int(offset_word, 16) == 7 * 32
     # bytes length prefix == 65, followed by the signature, right-padded to 32B.
-    length_word = body[8 + 7 * 64: 8 + 8 * 64]
+    length_word = body[8 + 7 * 64 : 8 + 8 * 64]
     assert int(length_word, 16) == 65
-    sig_region = body[8 + 8 * 64:]
+    sig_region = body[8 + 8 * 64 :]
     assert sig_region.startswith("11" * 65)
     assert len(sig_region) % 64 == 0  # padded to a whole word

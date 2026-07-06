@@ -16,13 +16,12 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_RPC, DEFAULT_TOKEN, send_tx
 
 from psv.chain import TokenView
 from psv.load import run_profile
 from psv.payloads import EvmSigner, sign_authorization
 from psv.reference_sut.server import ReferenceSut, SutConfig
-
-from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_RPC, DEFAULT_TOKEN, send_tx
 
 pytestmark = pytest.mark.load
 
@@ -31,12 +30,19 @@ N = 5
 
 def test_sequential_settlement_throughput(rpc: Any, funded_token: TokenView) -> None:
     token = funded_token
-    send_tx(rpc, ANVIL_ACCOUNTS["deployer"][1], DEFAULT_TOKEN,
-            token.set_event_mode_calldata(0), DEFAULT_CHAIN_ID)
+    send_tx(
+        rpc,
+        ANVIL_ACCOUNTS["deployer"][1],
+        DEFAULT_TOKEN,
+        token.set_event_mode_calldata(0),
+        DEFAULT_CHAIN_ID,
+    )
     sut = ReferenceSut(
         SutConfig(
-            token_address=DEFAULT_TOKEN, merchant_address=ANVIL_ACCOUNTS["merchant"][0],
-            facilitator_key=ANVIL_ACCOUNTS["deployer"][1], chain_id=DEFAULT_CHAIN_ID,
+            token_address=DEFAULT_TOKEN,
+            merchant_address=ANVIL_ACCOUNTS["merchant"][0],
+            facilitator_key=ANVIL_ACCOUNTS["deployer"][1],
+            chain_id=DEFAULT_CHAIN_ID,
             rpc_endpoint=DEFAULT_RPC,
         )
     )
@@ -48,8 +54,13 @@ def test_sequential_settlement_throughput(rpc: Any, funded_token: TokenView) -> 
     def task(i: int) -> None:
         quote = sut.quote()
         auth = sign_authorization(
-            signer=payer, to=merchant, value=amount, chain_id=DEFAULT_CHAIN_ID,
-            token_address=DEFAULT_TOKEN, token_name="USDC", token_version="2",
+            signer=payer,
+            to=merchant,
+            value=amount,
+            chain_id=DEFAULT_CHAIN_ID,
+            token_address=DEFAULT_TOKEN,
+            token_name="USDC",
+            token_version="2",
         )
         result = sut.pay(quote["order_id"], auth.as_dict())
         assert result["settled"] is True

@@ -129,8 +129,10 @@ class ReferenceSut:
         # re-submits on-chain (wasting gas, and double-crediting in a naive ledger).
         if order.paid and self.config.idempotent_pay:
             return {
-                "order_id": order_id, "settled": True,
-                "submitted_tx": order.submitted_tx, "idempotent": True,
+                "order_id": order_id,
+                "settled": True,
+                "submitted_tx": order.submitted_tx,
+                "idempotent": True,
             }
 
         # G3 guards - refuse to settle an expired or stale (under-priced) quote.
@@ -166,8 +168,13 @@ class ReferenceSut:
     def status(self, order_id: str) -> dict[str, Any]:
         order = self.orders.get(order_id)
         if order is None:
-            return {"order_id": order_id, "paid": False, "resource": None,
-                    "submitted_tx": None, "known": False}
+            return {
+                "order_id": order_id,
+                "paid": False,
+                "resource": None,
+                "submitted_tx": None,
+                "known": False,
+            }
         return {
             "order_id": order_id,
             "paid": order.paid,
@@ -198,16 +205,20 @@ class ReferenceSut:
             topics=[TOPIC_TRANSFER, None, topic_addr(self.config.merchant_address)],
             from_block=from_block,
         )
-        known = {o.submitted_tx.lower() for o in self.orders.values()
-                 if o.paid and o.submitted_tx}
+        known = {o.submitted_tx.lower() for o in self.orders.values() if o.paid and o.submitted_tx}
         unreconciled = find_unreconciled(logs, known)
         if self.config.reconciliation_enabled:
             for credit in unreconciled:
                 rid = "rec_" + credit.tx_hash[2:10]
                 self.orders[rid] = _Order(
-                    order_id=rid, amount=credit.value, expires_at=0,
-                    quoted_fair_price=credit.value, paid=True, submitted_tx=credit.tx_hash,
-                    resource=f"recovered::{credit.tx_hash}", recovered=True,
+                    order_id=rid,
+                    amount=credit.value,
+                    expires_at=0,
+                    quoted_fair_price=credit.value,
+                    paid=True,
+                    submitted_tx=credit.tx_hash,
+                    resource=f"recovered::{credit.tx_hash}",
+                    recovered=True,
                 )
         return unreconciled
 

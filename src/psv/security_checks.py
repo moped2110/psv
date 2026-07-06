@@ -67,8 +67,11 @@ def authorization_binds_to_chain(
     """
     try:
         recovered = recovered_signer(
-            auth, chain_id=expected_chain_id, token_address=token_address,
-            token_name=token_name, token_version=token_version,
+            auth,
+            chain_id=expected_chain_id,
+            token_address=token_address,
+            token_name=token_name,
+            token_version=token_version,
         )
     except Exception:
         return False
@@ -90,7 +93,7 @@ def sufficient_id_entropy(order_id: str, *, prefix: str = "ord_", min_random_hex
     enumerate them and try to claim another customer's paid resource. A random id
     of >= ``min_random_hex`` hex chars (e.g. ``secrets.token_hex(8)`` = 16) is not.
     """
-    body = order_id[len(prefix):] if order_id.startswith(prefix) else order_id
+    body = order_id[len(prefix) :] if order_id.startswith(prefix) else order_id
     return len(body) >= min_random_hex and bool(_HEX_RE.match(body))
 
 

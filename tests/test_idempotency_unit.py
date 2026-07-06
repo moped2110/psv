@@ -20,9 +20,13 @@ MERCHANT = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
 PAYER = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
 
 AUTH = {
-    "from": PAYER, "to": MERCHANT, "value": "10000",
-    "validAfter": "0", "validBefore": str(2**48),
-    "nonce": "0x" + "ab" * 32, "signature": "0x" + "11" * 65,
+    "from": PAYER,
+    "to": MERCHANT,
+    "value": "10000",
+    "validAfter": "0",
+    "validBefore": str(2**48),
+    "nonce": "0x" + "ab" * 32,
+    "signature": "0x" + "11" * 65,
 }
 
 
@@ -36,8 +40,12 @@ class _Rpc:
 
 def make_settling_sut(*, idempotent_pay: bool) -> tuple[ReferenceSut, list[Any]]:
     sut = ReferenceSut(
-        SutConfig(token_address=TOKEN, merchant_address=MERCHANT,
-                  facilitator_key=DEPLOYER_KEY, idempotent_pay=idempotent_pay)
+        SutConfig(
+            token_address=TOKEN,
+            merchant_address=MERCHANT,
+            facilitator_key=DEPLOYER_KEY,
+            idempotent_pay=idempotent_pay,
+        )
     )
     submits: list[Any] = []
     sut.rpc = _Rpc()  # type: ignore[assignment]

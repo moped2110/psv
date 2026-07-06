@@ -48,23 +48,41 @@ class RailConfig:
 # verified; an unset domain is fine because read-only reconciliation never signs.
 KNOWN_RAILS: dict[str, RailConfig] = {
     "mock-anvil": RailConfig(
-        "mock-anvil", "Local MockUSDC (Anvil)", 84532,
-        "0x5FbDB2315678afecb367f032d93F642f64180aa3", 6, "USDC", "2",
+        "mock-anvil",
+        "Local MockUSDC (Anvil)",
+        84532,
+        "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        6,
+        "USDC",
+        "2",
     ),
     "usdc-base": RailConfig(
-        "usdc-base", "USDC on Base", 8453,
-        "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", 6, "USD Coin", "2",
+        "usdc-base",
+        "USDC on Base",
+        8453,
+        "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        6,
+        "USD Coin",
+        "2",
     ),
     "jpyc-polygon": RailConfig(
-        "jpyc-polygon", "JPYC on Polygon", 137,
-        "0xe7c3d8c9a439fede00d2600032d5db0be71c3c29", 18, "JPY Coin", "1",
+        "jpyc-polygon",
+        "JPYC on Polygon",
+        137,
+        "0xe7c3d8c9a439fede00d2600032d5db0be71c3c29",
+        18,
+        "JPY Coin",
+        "1",
     ),
     "eurc-base": RailConfig(
         # EURC implements EIP-3009 natively and is supported by the CDP facilitator,
         # so it rides the same exact/eip3009 path as USDC — the MiCA-era EUR rail.
         # Domain intentionally unset: verify name/version on-chain before signing.
-        "eurc-base", "EURC on Base", 8453,
-        "0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42", 6,
+        "eurc-base",
+        "EURC on Base",
+        8453,
+        "0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42",
+        6,
     ),
 }
 

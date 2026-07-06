@@ -19,8 +19,13 @@ OTHER_CHAIN = 1
 def _auth(chain_id: int):
     signer = EvmSigner.from_key(PAYER_KEY)
     a = sign_authorization(
-        signer=signer, to=MERCHANT, value=10_000, chain_id=chain_id,
-        token_address=TOKEN, token_name="USDC", token_version="2",
+        signer=signer,
+        to=MERCHANT,
+        value=10_000,
+        chain_id=chain_id,
+        token_address=TOKEN,
+        token_name="USDC",
+        token_version="2",
         nonce="0x" + "cd" * 32,
     )
     return signer, a.as_dict()
@@ -28,28 +33,42 @@ def _auth(chain_id: int):
 
 def test_authorization_binds_to_its_own_chain() -> None:
     _signer, auth = _auth(HOME_CHAIN)
-    assert authorization_binds_to_chain(
-        auth, expected_chain_id=HOME_CHAIN, token_address=TOKEN,
-        token_name="USDC", token_version="2",
-    ) is True
+    assert (
+        authorization_binds_to_chain(
+            auth,
+            expected_chain_id=HOME_CHAIN,
+            token_address=TOKEN,
+            token_name="USDC",
+            token_version="2",
+        )
+        is True
+    )
 
 
 def test_cross_chain_replay_is_rejected() -> None:
     # Signed for OTHER_CHAIN, presented to a system on HOME_CHAIN: the recovered
     # address won't match `from`, so the binding check fails -> reject pre-flight.
     _signer, auth = _auth(OTHER_CHAIN)
-    assert authorization_binds_to_chain(
-        auth, expected_chain_id=HOME_CHAIN, token_address=TOKEN,
-        token_name="USDC", token_version="2",
-    ) is False
+    assert (
+        authorization_binds_to_chain(
+            auth,
+            expected_chain_id=HOME_CHAIN,
+            token_address=TOKEN,
+            token_name="USDC",
+            token_version="2",
+        )
+        is False
+    )
 
 
 def test_recovered_signer_differs_across_chains() -> None:
     signer, auth = _auth(HOME_CHAIN)
-    same = recovered_signer(auth, chain_id=HOME_CHAIN, token_address=TOKEN,
-                            token_name="USDC", token_version="2")
-    other = recovered_signer(auth, chain_id=OTHER_CHAIN, token_address=TOKEN,
-                             token_name="USDC", token_version="2")
+    same = recovered_signer(
+        auth, chain_id=HOME_CHAIN, token_address=TOKEN, token_name="USDC", token_version="2"
+    )
+    other = recovered_signer(
+        auth, chain_id=OTHER_CHAIN, token_address=TOKEN, token_name="USDC", token_version="2"
+    )
     assert same == signer.address
     assert other != signer.address  # wrong-chain recovery yields a different addr
 
@@ -66,7 +85,13 @@ def test_binds_to_chain_false_on_unrecoverable_signature() -> None:
     # (return False), never leak the exception to the caller.
     _signer, auth = _auth(HOME_CHAIN)
     auth["signature"] = "0x1234"  # too short to recover -> raises internally
-    assert authorization_binds_to_chain(
-        auth, expected_chain_id=HOME_CHAIN, token_address=TOKEN,
-        token_name="USDC", token_version="2",
-    ) is False
+    assert (
+        authorization_binds_to_chain(
+            auth,
+            expected_chain_id=HOME_CHAIN,
+            token_address=TOKEN,
+            token_name="USDC",
+            token_version="2",
+        )
+        is False
+    )

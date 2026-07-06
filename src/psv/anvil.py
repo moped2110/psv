@@ -132,7 +132,9 @@ class RpcClient:
     def send_raw_transaction(self, raw: str) -> str:
         return str(self.call("eth_sendRawTransaction", [raw]))
 
-    def wait_for_receipt(self, tx_hash: str, *, tries: int = 50, delay: float = 0.1) -> dict[str, Any]:
+    def wait_for_receipt(
+        self, tx_hash: str, *, tries: int = 50, delay: float = 0.1
+    ) -> dict[str, Any]:
         for _ in range(tries):
             receipt = self.call("eth_getTransactionReceipt", [tx_hash])
             if receipt is not None:
@@ -155,12 +157,15 @@ class AnvilProcess:
     def endpoint(self) -> str:
         return f"http://{self.host}:{self.port}"
 
-    def start(self, *, ready_timeout: float = 15.0) -> "AnvilProcess":
+    def start(self, *, ready_timeout: float = 15.0) -> AnvilProcess:
         cmd = [
             "anvil",
-            "--chain-id", str(self.chain_id),
-            "--port", str(self.port),
-            "--host", self.host,
+            "--chain-id",
+            str(self.chain_id),
+            "--port",
+            str(self.port),
+            "--host",
+            self.host,
             *self.extra_args,
         ]
         self._proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -187,7 +192,7 @@ class AnvilProcess:
                 self._proc.kill()
             self._proc = None
 
-    def __enter__(self) -> "AnvilProcess":
+    def __enter__(self) -> AnvilProcess:
         return self.start()
 
     def __exit__(self, *exc: object) -> None:

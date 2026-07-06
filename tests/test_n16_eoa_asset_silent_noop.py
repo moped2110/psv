@@ -19,12 +19,11 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_TOKEN, send_tx
 
 from psv.chain import TokenView
 from psv.payloads import EvmSigner, sign_authorization
 from psv.security_checks import asset_is_deployed_contract
-
-from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_TOKEN, send_tx
 
 pytestmark = pytest.mark.onchain
 
@@ -53,23 +52,32 @@ def test_settling_against_an_eoa_is_a_silent_noop(rpc: Any, funded_token: TokenV
     # transferWithAuthorization calldata TO that EOA — exactly what a system that
     # trusts a client-supplied asset (without an eth_getCode pre-flight) would do.
     auth = sign_authorization(
-        signer=payer, to=merchant, value=amount, chain_id=DEFAULT_CHAIN_ID,
-        token_address=_EOA_ASSET, token_name="USDC", token_version="2",
+        signer=payer,
+        to=merchant,
+        value=amount,
+        chain_id=DEFAULT_CHAIN_ID,
+        token_address=_EOA_ASSET,
+        token_name="USDC",
+        token_version="2",
     )
     calldata = TokenView(rpc=rpc, address=_EOA_ASSET).settle_calldata(
-        from_addr=payer.address, to=merchant, value=amount,
-        valid_after=auth.valid_after, valid_before=auth.valid_before,
-        nonce=auth.nonce, signature=auth.signature,
+        from_addr=payer.address,
+        to=merchant,
+        value=amount,
+        valid_after=auth.valid_after,
+        valid_before=auth.valid_before,
+        nonce=auth.nonce,
+        signature=auth.signature,
     )
     tx_hash = send_tx(rpc, ANVIL_ACCOUNTS["deployer"][1], _EOA_ASSET, calldata, DEFAULT_CHAIN_ID)
     receipt = rpc.call("eth_getTransactionReceipt", [tx_hash])
 
     # The call to an EOA does NOT revert — status success — yet nothing happened.
     assert receipt is not None
-    assert int(receipt["status"], 16) == 1                  # tx "succeeded"
+    assert int(receipt["status"], 16) == 1  # tx "succeeded"
     assert token.balance_of(payer.address) == payer_before  # but no funds moved
     assert token.balance_of(merchant) == merchant_before
-    assert receipt["logs"] == []                            # no Transfer / AuthorizationUsed
+    assert receipt["logs"] == []  # no Transfer / AuthorizationUsed
 
     # A system trusting that receipt would now phantom-credit the payer. The
     # eth_getCode guard is exactly what prevents reaching this point.

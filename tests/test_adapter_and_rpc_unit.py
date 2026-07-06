@@ -16,10 +16,16 @@ from psv.sut import HttpSutAdapter, parse_quote
 
 
 def test_parse_quote_normalizes_fields() -> None:
-    q = parse_quote({
-        "order_id": "ord_1", "amount": "10000", "payTo": "0xabc", "asset": "0xtok",
-        "network": "eip155:84532", "extra": {"name": "USDC", "version": "2"},
-    })
+    q = parse_quote(
+        {
+            "order_id": "ord_1",
+            "amount": "10000",
+            "payTo": "0xabc",
+            "asset": "0xtok",
+            "network": "eip155:84532",
+            "extra": {"name": "USDC", "version": "2"},
+        }
+    )
     assert q.amount == 10_000
     assert q.chain_id == 84532
     assert q.token_name == "USDC"
@@ -28,19 +34,33 @@ def test_parse_quote_normalizes_fields() -> None:
 def test_http_adapter_round_trip() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/quote":
-            return httpx.Response(200, json={
-                "order_id": "ord_x", "amount": "10000", "payTo": "0xmerchant",
-                "asset": "0xtok", "network": "eip155:84532",
-                "extra": {"name": "USDC", "version": "2"},
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "order_id": "ord_x",
+                    "amount": "10000",
+                    "payTo": "0xmerchant",
+                    "asset": "0xtok",
+                    "network": "eip155:84532",
+                    "extra": {"name": "USDC", "version": "2"},
+                },
+            )
         if request.url.path == "/pay":
             body = json.loads(request.content)
             assert body["order_id"] == "ord_x"
-            return httpx.Response(200, json={
-                "order_id": "ord_x", "submitted_tx": "0xdead", "settled": True})
+            return httpx.Response(
+                200, json={"order_id": "ord_x", "submitted_tx": "0xdead", "settled": True}
+            )
         if request.url.path == "/status/ord_x":
-            return httpx.Response(200, json={
-                "order_id": "ord_x", "paid": True, "resource": "premium", "submitted_tx": "0xdead"})
+            return httpx.Response(
+                200,
+                json={
+                    "order_id": "ord_x",
+                    "paid": True,
+                    "resource": "premium",
+                    "submitted_tx": "0xdead",
+                },
+            )
         return httpx.Response(404)
 
     client = httpx.Client(base_url="http://sut.test", transport=httpx.MockTransport(handler))

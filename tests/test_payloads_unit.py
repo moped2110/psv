@@ -16,10 +16,9 @@ from eth_account.messages import encode_typed_data
 
 from psv.payloads import (
     _TRANSFER_WITH_AUTHORIZATION_TYPES,
+    EvmSigner,
     _domain,
     _message,
-    Authorization,
-    EvmSigner,
     eip712_digest,
     sign_authorization,
 )
@@ -35,9 +34,15 @@ CHAIN_ID = 84532
 def _signed(**kw):
     signer = EvmSigner.from_key(PAYER_KEY)
     auth = sign_authorization(
-        signer=signer, to=MERCHANT, value=10_000, chain_id=CHAIN_ID,
-        token_address=TOKEN, token_name="USDC", token_version="2",
-        nonce="0x" + "ab" * 32, **kw,
+        signer=signer,
+        to=MERCHANT,
+        value=10_000,
+        chain_id=CHAIN_ID,
+        token_address=TOKEN,
+        token_name="USDC",
+        token_version="2",
+        nonce="0x" + "ab" * 32,
+        **kw,
     )
     return signer, auth
 

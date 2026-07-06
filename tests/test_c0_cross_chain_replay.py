@@ -14,13 +14,12 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_RPC, DEFAULT_TOKEN, send_tx
 
 from psv.chain import TokenView
 from psv.payloads import EvmSigner, sign_authorization
 from psv.reference_sut.server import ReferenceSut, SutConfig
 from psv.security_checks import authorization_binds_to_chain
-
-from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_RPC, DEFAULT_TOKEN, send_tx
 
 pytestmark = pytest.mark.onchain
 
@@ -31,12 +30,19 @@ def test_cross_chain_replayed_authorization_does_not_settle(
     rpc: Any, funded_token: TokenView
 ) -> None:
     token = funded_token
-    send_tx(rpc, ANVIL_ACCOUNTS["deployer"][1], DEFAULT_TOKEN,
-            token.set_event_mode_calldata(0), DEFAULT_CHAIN_ID)
+    send_tx(
+        rpc,
+        ANVIL_ACCOUNTS["deployer"][1],
+        DEFAULT_TOKEN,
+        token.set_event_mode_calldata(0),
+        DEFAULT_CHAIN_ID,
+    )
     sut = ReferenceSut(
         SutConfig(
-            token_address=DEFAULT_TOKEN, merchant_address=ANVIL_ACCOUNTS["merchant"][0],
-            facilitator_key=ANVIL_ACCOUNTS["deployer"][1], chain_id=DEFAULT_CHAIN_ID,
+            token_address=DEFAULT_TOKEN,
+            merchant_address=ANVIL_ACCOUNTS["merchant"][0],
+            facilitator_key=ANVIL_ACCOUNTS["deployer"][1],
+            chain_id=DEFAULT_CHAIN_ID,
             rpc_endpoint=DEFAULT_RPC,
         )
     )
@@ -50,15 +56,26 @@ def test_cross_chain_replayed_authorization_does_not_settle(
 
     # Sign for the FOREIGN chain — a replay against this system.
     auth = sign_authorization(
-        signer=payer, to=merchant, value=amount, chain_id=FOREIGN_CHAIN_ID,
-        token_address=DEFAULT_TOKEN, token_name="USDC", token_version="2",
+        signer=payer,
+        to=merchant,
+        value=amount,
+        chain_id=FOREIGN_CHAIN_ID,
+        token_address=DEFAULT_TOKEN,
+        token_name="USDC",
+        token_version="2",
     )
 
     # Pre-flight: the harness rejects it (recovers to a different address here).
-    assert authorization_binds_to_chain(
-        auth.as_dict(), expected_chain_id=DEFAULT_CHAIN_ID, token_address=DEFAULT_TOKEN,
-        token_name="USDC", token_version="2",
-    ) is False
+    assert (
+        authorization_binds_to_chain(
+            auth.as_dict(),
+            expected_chain_id=DEFAULT_CHAIN_ID,
+            token_address=DEFAULT_TOKEN,
+            token_name="USDC",
+            token_version="2",
+        )
+        is False
+    )
 
     # On-chain: the token reverts (or the send is rejected) — either way, the
     # settlement cannot go through.

@@ -17,22 +17,25 @@ from psv.security_checks import asset_is_deployed_contract
 
 
 def test_eoa_code_is_rejected() -> None:
-    assert asset_is_deployed_contract("0x") is False          # EOA: empty code
+    assert asset_is_deployed_contract("0x") is False  # EOA: empty code
     assert asset_is_deployed_contract("") is False
     assert asset_is_deployed_contract("0x" + "00" * 16) is False  # all-zero edge
 
 
 def test_contract_code_is_accepted() -> None:
     assert asset_is_deployed_contract("0x60806040523480") is True
-    assert asset_is_deployed_contract("60806040") is True     # without 0x prefix
+    assert asset_is_deployed_contract("60806040") is True  # without 0x prefix
 
 
 def test_eoa_settlement_is_a_phantom_credit() -> None:
     # Model the silent no-op: a settle the SUT thinks succeeded, but chain truth
     # shows the nonce was never consumed and nothing moved.
     truth = SettlementTruth(
-        nonce_consumed=False, payer_balance_after=1_000, payee_balance_after=0,
-        payer_delta=0, payee_delta=0,
+        nonce_consumed=False,
+        payer_balance_after=1_000,
+        payee_balance_after=0,
+        payer_delta=0,
+        payee_delta=0,
     )
     assert truth.funds_moved is False  # SUT-believed payment is a phantom credit
 

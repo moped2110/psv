@@ -18,12 +18,11 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_RPC, DEFAULT_TOKEN, send_tx
 
 from psv.chain import TokenView
 from psv.payloads import EvmSigner, sign_authorization
 from psv.reference_sut.server import ReferenceSut, SutConfig
-
-from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_RPC, DEFAULT_TOKEN, send_tx
 
 pytestmark = pytest.mark.onchain
 
@@ -48,8 +47,13 @@ def _pay_twice(sut: ReferenceSut, token: TokenView) -> tuple[str, int, int]:
     amount = int(quote["amount"])
     merchant_before = token.balance_of(merchant)
     auth = sign_authorization(
-        signer=payer, to=merchant, value=amount, chain_id=DEFAULT_CHAIN_ID,
-        token_address=DEFAULT_TOKEN, token_name="USDC", token_version="2",
+        signer=payer,
+        to=merchant,
+        value=amount,
+        chain_id=DEFAULT_CHAIN_ID,
+        token_address=DEFAULT_TOKEN,
+        token_name="USDC",
+        token_version="2",
     )
     sut.pay(quote["order_id"], auth.as_dict())
     sut.pay(quote["order_id"], auth.as_dict())  # retry with the same order + auth
@@ -59,8 +63,13 @@ def _pay_twice(sut: ReferenceSut, token: TokenView) -> tuple[str, int, int]:
 
 def test_idempotent_sut_does_not_resubmit(rpc: Any, funded_token: TokenView) -> None:
     token = funded_token
-    send_tx(rpc, ANVIL_ACCOUNTS["deployer"][1], DEFAULT_TOKEN,
-            token.set_event_mode_calldata(0), DEFAULT_CHAIN_ID)
+    send_tx(
+        rpc,
+        ANVIL_ACCOUNTS["deployer"][1],
+        DEFAULT_TOKEN,
+        token.set_event_mode_calldata(0),
+        DEFAULT_CHAIN_ID,
+    )
     sut = _sut(idempotent=True)
     oid, amount, credited = _pay_twice(sut, token)
     assert credited == amount  # merchant credited exactly once
@@ -69,8 +78,13 @@ def test_idempotent_sut_does_not_resubmit(rpc: Any, funded_token: TokenView) -> 
 
 def test_vulnerable_sut_resubmits_second_settlement(rpc: Any, funded_token: TokenView) -> None:
     token = funded_token
-    send_tx(rpc, ANVIL_ACCOUNTS["deployer"][1], DEFAULT_TOKEN,
-            token.set_event_mode_calldata(0), DEFAULT_CHAIN_ID)
+    send_tx(
+        rpc,
+        ANVIL_ACCOUNTS["deployer"][1],
+        DEFAULT_TOKEN,
+        token.set_event_mode_calldata(0),
+        DEFAULT_CHAIN_ID,
+    )
     sut = _sut(idempotent=False)
     oid, amount, credited = _pay_twice(sut, token)
     assert credited == amount  # token's nonce guard still prevents a double-debit

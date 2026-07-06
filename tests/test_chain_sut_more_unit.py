@@ -53,15 +53,21 @@ def test_mint_calldata() -> None:
     data = TokenView(_Rpc(), TOKEN).mint_calldata(ADDR, 1_000_000)  # type: ignore[arg-type]
     body = data.removeprefix("0x")
     assert body[:8] == SEL_MINT
-    assert body[8:8 + 64] == ADDR.lower().removeprefix("0x").rjust(64, "0")
-    assert int(body[8 + 64:8 + 128], 16) == 1_000_000
+    assert body[8 : 8 + 64] == ADDR.lower().removeprefix("0x").rjust(64, "0")
+    assert int(body[8 + 64 : 8 + 128], 16) == 1_000_000
 
 
 def test_parse_quote_chain_id() -> None:
-    q = parse_quote({
-        "order_id": "o", "amount": "1", "payTo": "0xm", "asset": "0xt",
-        "network": "eip155:8453", "extra": {"name": "USDC", "version": "2"},
-    })
+    q = parse_quote(
+        {
+            "order_id": "o",
+            "amount": "1",
+            "payTo": "0xm",
+            "asset": "0xt",
+            "network": "eip155:8453",
+            "extra": {"name": "USDC", "version": "2"},
+        }
+    )
     assert q.chain_id == 8453
 
 

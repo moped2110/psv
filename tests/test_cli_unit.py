@@ -42,8 +42,14 @@ def _fake_token(balances: dict[str, int], nonce_used: bool) -> TokenView:
 def test_run_reconcile_phantom_credit_is_failure() -> None:
     token = _fake_token({PAYER.lower(): 1000, PAYEE.lower(): 0}, nonce_used=False)
     report = run_reconcile(
-        token, get_rail("eurc-base"), payer=PAYER, payee=PAYEE, nonce=NONCE,
-        payer_before=1000, payee_before=0, sut_believes_paid=True,
+        token,
+        get_rail("eurc-base"),
+        payer=PAYER,
+        payee=PAYEE,
+        nonce=NONCE,
+        payer_before=1000,
+        payee_before=0,
+        sut_believes_paid=True,
     )
     assert report.kind == "phantom_credit"
     assert report.is_failure is True
@@ -53,8 +59,14 @@ def test_run_reconcile_phantom_credit_is_failure() -> None:
 def test_run_reconcile_consistent_paid_is_clean() -> None:
     token = _fake_token({PAYER.lower(): 900, PAYEE.lower(): 100}, nonce_used=True)
     report = run_reconcile(
-        token, get_rail("usdc-base"), payer=PAYER, payee=PAYEE, nonce=NONCE,
-        payer_before=1000, payee_before=0, sut_believes_paid=True,
+        token,
+        get_rail("usdc-base"),
+        payer=PAYER,
+        payee=PAYEE,
+        nonce=NONCE,
+        payer_before=1000,
+        payee_before=0,
+        sut_believes_paid=True,
     )
     assert report.kind == "consistent_paid"
     assert report.is_failure is False
@@ -64,8 +76,14 @@ def test_run_reconcile_consistent_paid_is_clean() -> None:
 def test_report_json_shape() -> None:
     token = _fake_token({PAYER.lower(): 900, PAYEE.lower(): 100}, nonce_used=True)
     report = run_reconcile(
-        token, get_rail("usdc-base"), payer=PAYER, payee=PAYEE, nonce=NONCE,
-        payer_before=1000, payee_before=0, sut_believes_paid=False,  # silent loss
+        token,
+        get_rail("usdc-base"),
+        payer=PAYER,
+        payee=PAYEE,
+        nonce=NONCE,
+        payer_before=1000,
+        payee_before=0,
+        sut_believes_paid=False,  # silent loss
     )
     doc = json.loads(report.to_json())
     assert doc["divergence"]["kind"] == "silent_loss"
@@ -76,10 +94,18 @@ def test_report_json_shape() -> None:
 
 def test_report_markdown_is_readonly_and_explains() -> None:
     report = ReconReport(
-        rail_key="usdc-base", rail_label="USDC on Base", chain_id=8453,
-        token_address="0xabc", payer=PAYER, payee=PAYEE, nonce=NONCE,
-        sut_believes_paid=True, kind="phantom_credit", severity="critical",
-        message="PHANTOM CREDIT: …", is_failure=True,
+        rail_key="usdc-base",
+        rail_label="USDC on Base",
+        chain_id=8453,
+        token_address="0xabc",
+        payer=PAYER,
+        payee=PAYEE,
+        nonce=NONCE,
+        sut_believes_paid=True,
+        kind="phantom_credit",
+        severity="critical",
+        message="PHANTOM CREDIT: …",
+        is_failure=True,
     )
     md = report.to_markdown()
     assert "Read-only" in md
@@ -91,16 +117,44 @@ def test_main_reconcile_end_to_end(monkeypatch: Any) -> None:
     # Swap the live RPC for a fake-transport token; exercise argparse + exit code.
     token = _fake_token({PAYER.lower(): 1000, PAYEE.lower(): 0}, nonce_used=False)
     monkeypatch.setattr("psv.cli.token_for_rail", lambda rail, rpc: token)
-    code = main([
-        "reconcile", "--rail", "eurc-base", "--payer", PAYER, "--payee", PAYEE,
-        "--nonce", NONCE, "--payer-before", "1000", "--payee-before", "0", "--sut-paid",
-    ])
+    code = main(
+        [
+            "reconcile",
+            "--rail",
+            "eurc-base",
+            "--payer",
+            PAYER,
+            "--payee",
+            PAYEE,
+            "--nonce",
+            NONCE,
+            "--payer-before",
+            "1000",
+            "--payee-before",
+            "0",
+            "--sut-paid",
+        ]
+    )
     assert code == 1  # phantom credit
 
 
 def test_main_unknown_rail_exits_2() -> None:
-    code = main([
-        "reconcile", "--rail", "nope", "--payer", PAYER, "--payee", PAYEE,
-        "--nonce", NONCE, "--payer-before", "0", "--payee-before", "0", "--sut-unpaid",
-    ])
+    code = main(
+        [
+            "reconcile",
+            "--rail",
+            "nope",
+            "--payer",
+            PAYER,
+            "--payee",
+            PAYEE,
+            "--nonce",
+            NONCE,
+            "--payer-before",
+            "0",
+            "--payee-before",
+            "0",
+            "--sut-unpaid",
+        ]
+    )
     assert code == 2

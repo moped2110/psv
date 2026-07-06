@@ -51,8 +51,13 @@ def send_tx(rpc: Any, key: str, to: str, data: str, chain_id: int, gas: int = 40
     except Exception:
         gas_price = 1_000_000_000
     tx = {
-        "to": to, "data": data, "value": 0, "gas": gas,
-        "gasPrice": gas_price, "nonce": nonce, "chainId": chain_id,
+        "to": to,
+        "data": data,
+        "value": 0,
+        "gas": gas,
+        "gasPrice": gas_price,
+        "nonce": nonce,
+        "chainId": chain_id,
     }
     signed = acct.sign_transaction(tx)
     tx_hash = rpc.send_raw_transaction(signed.raw_transaction.to_0x_hex())
@@ -99,5 +104,7 @@ def funded_token(rpc: Any, chain_snapshot: None) -> Any:
     payer = ANVIL_ACCOUNTS["payer"][0]
     deployer_key = ANVIL_ACCOUNTS["deployer"][1]
     # Mint plenty of test USDC to the payer.
-    send_tx(rpc, deployer_key, DEFAULT_TOKEN, token.mint_calldata(payer, 1_000_000), DEFAULT_CHAIN_ID)
+    send_tx(
+        rpc, deployer_key, DEFAULT_TOKEN, token.mint_calldata(payer, 1_000_000), DEFAULT_CHAIN_ID
+    )
     return token

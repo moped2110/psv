@@ -13,13 +13,12 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_RPC, DEFAULT_TOKEN, send_tx
 
 from psv.chain import TokenView
 from psv.payloads import EvmSigner, sign_authorization
 from psv.reference_sut.server import ReferenceSut, SutConfig
 from psv.token_quirks import net_after_fee, received_is_sufficient, underpayment
-
-from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_RPC, DEFAULT_TOKEN, send_tx
 
 pytestmark = pytest.mark.onchain
 
@@ -37,8 +36,11 @@ def test_fee_on_transfer_underpayment_caught_by_received_delta(
 
     sut = ReferenceSut(
         SutConfig(
-            token_address=DEFAULT_TOKEN, merchant_address=ANVIL_ACCOUNTS["merchant"][0],
-            facilitator_key=deployer_key, chain_id=DEFAULT_CHAIN_ID, rpc_endpoint=DEFAULT_RPC,
+            token_address=DEFAULT_TOKEN,
+            merchant_address=ANVIL_ACCOUNTS["merchant"][0],
+            facilitator_key=deployer_key,
+            chain_id=DEFAULT_CHAIN_ID,
+            rpc_endpoint=DEFAULT_RPC,
         )
     )
     payer = EvmSigner.from_key(ANVIL_ACCOUNTS["payer"][1])
@@ -48,8 +50,13 @@ def test_fee_on_transfer_underpayment_caught_by_received_delta(
     required = int(quote["amount"])
     merchant_before = token.balance_of(merchant)
     auth = sign_authorization(
-        signer=payer, to=merchant, value=required, chain_id=DEFAULT_CHAIN_ID,
-        token_address=DEFAULT_TOKEN, token_name="USDC", token_version="2",
+        signer=payer,
+        to=merchant,
+        value=required,
+        chain_id=DEFAULT_CHAIN_ID,
+        token_address=DEFAULT_TOKEN,
+        token_name="USDC",
+        token_version="2",
     )
     result = sut.pay(quote["order_id"], auth.as_dict())
 

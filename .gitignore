@@ -31,3 +31,4 @@ onchain/broadcast/
 # Anvil state dumps
 *.anvil
 anvil-state.json
+.coverage

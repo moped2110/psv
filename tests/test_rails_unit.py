@@ -80,8 +80,13 @@ def test_unknown_rail_raises() -> None:
 def test_consistent_paid() -> None:
     token = _token({PAYER.lower(): 900, PAYEE.lower(): 100}, nonce_used=True)
     d = reconcile_live(
-        token, payer=PAYER, payee=PAYEE, nonce="0x" + "ab" * 32,
-        payer_before=1000, payee_before=0, sut_believes_paid=True,
+        token,
+        payer=PAYER,
+        payee=PAYEE,
+        nonce="0x" + "ab" * 32,
+        payer_before=1000,
+        payee_before=0,
+        sut_believes_paid=True,
     )
     assert d.kind is DivergenceKind.CONSISTENT_PAID and not d.is_failure
 
@@ -90,8 +95,13 @@ def test_phantom_credit_caught() -> None:
     # System believes paid, but nothing moved on-chain (nonce free, balances flat).
     token = _token({PAYER.lower(): 1000, PAYEE.lower(): 0}, nonce_used=False)
     d = reconcile_live(
-        token, payer=PAYER, payee=PAYEE, nonce="0x" + "ab" * 32,
-        payer_before=1000, payee_before=0, sut_believes_paid=True,
+        token,
+        payer=PAYER,
+        payee=PAYEE,
+        nonce="0x" + "ab" * 32,
+        payer_before=1000,
+        payee_before=0,
+        sut_believes_paid=True,
     )
     assert d.kind is DivergenceKind.PHANTOM_CREDIT and d.is_failure
 
@@ -100,7 +110,12 @@ def test_silent_loss_caught() -> None:
     # Funds moved on-chain, but the system thinks the order is unpaid.
     token = _token({PAYER.lower(): 900, PAYEE.lower(): 100}, nonce_used=True)
     d = reconcile_live(
-        token, payer=PAYER, payee=PAYEE, nonce="0x" + "ab" * 32,
-        payer_before=1000, payee_before=0, sut_believes_paid=False,
+        token,
+        payer=PAYER,
+        payee=PAYEE,
+        nonce="0x" + "ab" * 32,
+        payer_before=1000,
+        payee_before=0,
+        sut_believes_paid=False,
     )
     assert d.kind is DivergenceKind.SILENT_LOSS and d.is_failure

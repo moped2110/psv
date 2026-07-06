@@ -14,14 +14,13 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_RPC, DEFAULT_TOKEN, send_tx
 
 from psv.chain import TokenView
 from psv.divergence import DivergenceKind, detect_payment_divergence, settlement_truth_from_balances
 from psv.payloads import EvmSigner, sign_authorization
 from psv.reference_sut.server import ReferenceSut, SutConfig
 from psv.reorg import confirmations, is_final, reorg_to, take_checkpoint
-
-from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_RPC, DEFAULT_TOKEN, send_tx
 
 pytestmark = pytest.mark.onchain
 
@@ -44,8 +43,13 @@ def test_reorg_undoes_settlement_but_sut_keeps_phantom_credit(
     rpc: Any, funded_token: TokenView
 ) -> None:
     token = funded_token
-    send_tx(rpc, ANVIL_ACCOUNTS["deployer"][1], DEFAULT_TOKEN,
-            token.set_event_mode_calldata(0), DEFAULT_CHAIN_ID)
+    send_tx(
+        rpc,
+        ANVIL_ACCOUNTS["deployer"][1],
+        DEFAULT_TOKEN,
+        token.set_event_mode_calldata(0),
+        DEFAULT_CHAIN_ID,
+    )
     sut = _sut()
     payer = EvmSigner.from_key(ANVIL_ACCOUNTS["payer"][1])
     merchant = ANVIL_ACCOUNTS["merchant"][0]
@@ -59,8 +63,13 @@ def test_reorg_undoes_settlement_but_sut_keeps_phantom_credit(
     checkpoint = take_checkpoint(rpc)
 
     auth = sign_authorization(
-        signer=payer, to=merchant, value=amount, chain_id=DEFAULT_CHAIN_ID,
-        token_address=DEFAULT_TOKEN, token_name="USDC", token_version="2",
+        signer=payer,
+        to=merchant,
+        value=amount,
+        chain_id=DEFAULT_CHAIN_ID,
+        token_address=DEFAULT_TOKEN,
+        token_name="USDC",
+        token_version="2",
     )
     result = sut.pay(quote["order_id"], auth.as_dict())
     assert result["settled"] is True
@@ -86,8 +95,10 @@ def test_reorg_undoes_settlement_but_sut_keeps_phantom_credit(
 
     truth = settlement_truth_from_balances(
         nonce_consumed=token.authorization_used(payer.address, auth.nonce),
-        payer_before=payer_pre, payer_after=payer_post,
-        payee_before=merchant_pre, payee_after=merchant_post,
+        payer_before=payer_pre,
+        payer_after=payer_post,
+        payee_before=merchant_pre,
+        payee_after=merchant_post,
     )
     assert truth.funds_moved is False
 

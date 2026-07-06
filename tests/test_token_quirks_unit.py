@@ -65,11 +65,17 @@ def test_fee_token_fools_event_watcher_but_not_received_delta() -> None:
     net = net_after_fee(required, fee_bps)  # 9_800 actually credited
 
     def fetch(addr, topics, from_block):
-        return [{"topics": [TOPIC_TRANSFER, topic_addr(PAYER), topic_addr(MERCHANT)],
-                 "data": hex(required)}]  # gross event, not the net credited
+        return [
+            {
+                "topics": [TOPIC_TRANSFER, topic_addr(PAYER), topic_addr(MERCHANT)],
+                "data": hex(required),
+            }
+        ]  # gross event, not the net credited
 
     confirmer = EventWatchingConfirmer(fetch_logs=fetch)
-    assert confirmer.is_settled(token="0xt", payer=PAYER, payee=MERCHANT, min_value=required) is True
+    assert (
+        confirmer.is_settled(token="0xt", payer=PAYER, payee=MERCHANT, min_value=required) is True
+    )
 
     # ...but verifying on the real received balance delta catches the underpayment.
     assert received_is_sufficient(net, required) is False

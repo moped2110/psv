@@ -25,9 +25,9 @@ def _rounds() -> list[Round]:
     # A random-ish walk: some up (exploitable), some down (abandoned).
     return [
         Round(10_000, 13_000),  # +3000 in the money
-        Round(10_000, 8_000),   # out -> abandoned
+        Round(10_000, 8_000),  # out -> abandoned
         Round(10_000, 11_000),  # +1000
-        Round(10_000, 9_500),   # out -> abandoned
+        Round(10_000, 9_500),  # out -> abandoned
         Round(10_000, 20_000),  # +10000
     ]
 

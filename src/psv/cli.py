@@ -68,22 +68,46 @@ def _build_parser() -> argparse.ArgumentParser:
         "reconcile",
         help="Read-only: compare one payment against on-chain truth for a known rail.",
     )
-    r.add_argument("--rail", required=True, help="Rail key (e.g. usdc-base, jpyc-polygon, eurc-base)")
+    r.add_argument(
+        "--rail", required=True, help="Rail key (e.g. usdc-base, jpyc-polygon, eurc-base)"
+    )
     r.add_argument("--payer", required=True, help="Payer address")
     r.add_argument("--payee", required=True, help="Payee (merchant) address")
     r.add_argument("--nonce", required=True, help="EIP-3009 authorization nonce (0x…32 bytes)")
-    r.add_argument("--payer-before", type=int, required=True,
-                   help="Payer token balance (atomic units) BEFORE the payment")
-    r.add_argument("--payee-before", type=int, required=True,
-                   help="Payee token balance (atomic units) BEFORE the payment")
+    r.add_argument(
+        "--payer-before",
+        type=int,
+        required=True,
+        help="Payer token balance (atomic units) BEFORE the payment",
+    )
+    r.add_argument(
+        "--payee-before",
+        type=int,
+        required=True,
+        help="Payee token balance (atomic units) BEFORE the payment",
+    )
     belief = r.add_mutually_exclusive_group(required=True)
-    belief.add_argument("--sut-paid", dest="sut_believes_paid", action="store_true",
-                        help="The system believes this order was paid")
-    belief.add_argument("--sut-unpaid", dest="sut_believes_paid", action="store_false",
-                        help="The system believes this order is unpaid")
-    r.add_argument("--rpc-url", default=None, help="JSON-RPC endpoint (default http://127.0.0.1:8545)")
-    r.add_argument("--json", dest="json_out", default=None, help="Write the JSON report to this path")
-    r.add_argument("--markdown", dest="md_out", default=None, help="Write the Markdown report to this path")
+    belief.add_argument(
+        "--sut-paid",
+        dest="sut_believes_paid",
+        action="store_true",
+        help="The system believes this order was paid",
+    )
+    belief.add_argument(
+        "--sut-unpaid",
+        dest="sut_believes_paid",
+        action="store_false",
+        help="The system believes this order is unpaid",
+    )
+    r.add_argument(
+        "--rpc-url", default=None, help="JSON-RPC endpoint (default http://127.0.0.1:8545)"
+    )
+    r.add_argument(
+        "--json", dest="json_out", default=None, help="Write the JSON report to this path"
+    )
+    r.add_argument(
+        "--markdown", dest="md_out", default=None, help="Write the Markdown report to this path"
+    )
     return parser
 
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .divergence import Divergence
 from .rails import RailConfig
@@ -70,7 +70,7 @@ class ReconReport:
             {
                 "reportVersion": REPORT_VERSION,
                 "tool": {"name": "psv", "mode": "reconcile", "readOnly": True},
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "rail": {
                     "key": self.rail_key,
                     "label": self.rail_label,

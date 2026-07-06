@@ -36,7 +36,9 @@ class FakeRpc:
 
 def make_sut(*, logs: list[dict[str, Any]] | None = None, **cfg: Any) -> ReferenceSut:
     sut = ReferenceSut(
-        SutConfig(token_address=TOKEN, merchant_address=MERCHANT, facilitator_key=DEPLOYER_KEY, **cfg)
+        SutConfig(
+            token_address=TOKEN, merchant_address=MERCHANT, facilitator_key=DEPLOYER_KEY, **cfg
+        )
     )
     sut.rpc = FakeRpc(block=100, logs=logs)  # type: ignore[assignment]
     return sut

@@ -29,9 +29,13 @@ def make_fetcher(emitted_topic0: str, value: int):
     def fetch(address: str, topics: list[str | None], from_block: int) -> list[dict[str, object]]:
         # eth_getLogs only returns logs whose topic0 matches the requested filter.
         if topics and topics[0] == emitted_topic0:
-            return [{"address": address,
-                     "topics": [emitted_topic0, topic_addr(PAYER), topic_addr(PAYEE)],
-                     "data": hex(value)}]
+            return [
+                {
+                    "address": address,
+                    "topics": [emitted_topic0, topic_addr(PAYER), topic_addr(PAYEE)],
+                    "data": hex(value),
+                }
+            ]
         return []
 
     return fetch

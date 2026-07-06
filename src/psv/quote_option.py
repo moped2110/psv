@@ -62,7 +62,9 @@ class ExploitResult:
         return self.system_loss > 0
 
 
-def simulate_attacker(rounds: Sequence[Round], *, tolerance: float = 0.0, reprice: bool) -> ExploitResult:
+def simulate_attacker(
+    rounds: Sequence[Round], *, tolerance: float = 0.0, reprice: bool
+) -> ExploitResult:
     """Run a rational buyer over ``rounds`` against a system with/without a guard.
 
     The buyer exercises iff the quote is in the money. A re-pricing system
