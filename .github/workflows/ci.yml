@@ -7,6 +7,20 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: Lint (ruff check)
+        run: python -m ruff check src tests
+      - name: Format check (ruff format)
+        run: python -m ruff format --check src tests
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -23,6 +37,6 @@ jobs:
       - name: Install
         run: pip install -e ".[dev]"
       - name: Tests (offline; on-chain + load are deselected by default)
-        run: pytest -q
+        run: pytest -q --cov --cov-fail-under=85
       - name: Type-check (mypy strict)
         run: mypy
