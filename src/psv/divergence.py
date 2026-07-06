@@ -21,13 +21,15 @@ from .chain import SettlementTruth
 
 
 class DivergenceKind(str, Enum):
-    """The four ways chain truth and SUT belief can line up. The two consistent
-    cases are healthy; the two asymmetric ones are the bugs worth money."""
+    """The ways chain truth and SUT belief can line up. The two consistent cases
+    are healthy; the asymmetric ones are the bugs worth money. UNDERPAID_CREDIT is
+    the subtle case funds_moved alone misses: money moved, but not *enough*."""
 
     CONSISTENT_PAID = "consistent_paid"
     CONSISTENT_UNPAID = "consistent_unpaid"
     SILENT_LOSS = "silent_loss"  # funds moved on-chain, SUT believes unpaid
     PHANTOM_CREDIT = "phantom_credit"  # SUT believes paid, no funds moved
+    UNDERPAID_CREDIT = "underpaid_credit"  # SUT believes paid, but < required arrived
 
 
 class Severity(str, Enum):
@@ -51,14 +53,45 @@ class Divergence:
         return self.severity is Severity.CRITICAL
 
 
-def detect_payment_divergence(chain: SettlementTruth, sut_believes_paid: bool) -> Divergence:
-    """Compare on-chain ground truth against the SUT's belief about one payment."""
+def detect_payment_divergence(
+    chain: SettlementTruth,
+    sut_believes_paid: bool,
+    required_amount: int | None = None,
+) -> Divergence:
+    """Compare on-chain ground truth against the SUT's belief about one payment.
+
+    ``required_amount`` (the invoiced amount, in token base units) is optional and
+    backward-compatible: when given, a credited order where the merchant received
+    *less* than the invoice is flagged as UNDERPAID_CREDIT. ``funds_moved`` only
+    asks "did any money move?"; it cannot see a partial payment or a token that
+    skims a fee in transit, so without ``required_amount`` those slip through as
+    healthy. We compare against ``payee_delta`` — what the merchant actually netted
+    — not what the payer was charged, since the merchant's exposure is the shortfall.
+    """
     moved = chain.funds_moved
     if moved and sut_believes_paid:
+        if required_amount is not None and chain.payee_delta < required_amount:
+            short = required_amount - chain.payee_delta
+            return Divergence(
+                DivergenceKind.UNDERPAID_CREDIT,
+                Severity.CRITICAL,
+                (
+                    "UNDERPAID CREDIT: the SUT credited the order as paid, but the merchant "
+                    f"received {chain.payee_delta:d} on-chain against a required "
+                    f"{required_amount:d} — short by {short:d}. The order is handed out for "
+                    "less than its price: a partial payment, or a fee-on-transfer / rebasing "
+                    "token skimming the difference, waved through as full settlement."
+                ),
+            )
+        enough = (
+            f" Received {chain.payee_delta:d} >= required {required_amount:d}."
+            if required_amount is not None
+            else ""
+        )
         return Divergence(
             DivergenceKind.CONSISTENT_PAID,
             Severity.OK,
-            "Funds moved on-chain and the SUT correctly registered the payment.",
+            "Funds moved on-chain and the SUT correctly registered the payment." + enough,
         )
     if not moved and not sut_believes_paid:
         return Divergence(

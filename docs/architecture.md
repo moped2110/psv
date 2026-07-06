@@ -31,7 +31,7 @@ ground truth*.
 | `psv.payloads` | EIP-3009 `TransferWithAuthorization` signing (independent of any x402 SDK). |
 | `psv.sut` | `SutAdapter` ABC + `HttpSutAdapter`. The contract every SUT must satisfy: `quote` / `pay` / `status`. |
 | `psv.reference_sut` | A bundled, faithful SUT used to exercise the harness. Settlement is confirmed by **watching the `Transfer` event** — deliberately the SC1-vulnerable pattern. |
-| `psv.divergence` | Compares ground truth to SUT belief → `Divergence` (`silent_loss` / `phantom_credit` / consistent, + severity). |
+| `psv.divergence` | Compares ground truth to SUT belief → `Divergence` (`silent_loss` / `phantom_credit` / `underpaid_credit` / consistent, + severity). |
 | `psv.reorg` | Reorg/finality math: a payment settled then invalidated by a shallow reorg → `phantom_credit`. (`docs/r-reorg-finality.md`) |
 | `psv.token_quirks` | Decimals (fail-loud) + fee-on-transfer: verify on the merchant's **net balance delta**, not the gross `Transfer` event. (`docs/t-token-quirks.md`) |
 | `psv.security_checks` | Game-theory guards: cross-chain replay binding (C0), asset-scoping / fake-token (N10), order-id entropy (N15), EOA-asset `eth_getCode` pre-flight (N16). (`docs/c-security-gametheory.md`) |

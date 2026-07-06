@@ -25,7 +25,8 @@ case (`psv.token_quirks`).
 `reconcile_live(token, payer=…, payee=…, nonce=…, payer_before=…, payee_before=…,
 sut_believes_paid=…)` **only reads** the chain (balances + whether the EIP-3009
 nonce was consumed) and compares it to what the system believes, returning a
-`Divergence` (`consistent_paid` / `phantom_credit` / `silent_loss`). It **never
+`Divergence` (`consistent_paid` / `phantom_credit` / `silent_loss` /
+`underpaid_credit`). It **never
 signs or settles** on a real rail — outbound value stays testnet/Anvil only. A
 `RailConfig`'s EIP-712 domain (`token_name`/`token_version`) is therefore needed
 only for the local Anvil *signing* path; live read-only reconciliation ignores it,
