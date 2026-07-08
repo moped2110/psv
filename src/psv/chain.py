@@ -18,7 +18,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .anvil import RpcClient
+from .anvil import RpcClient, RpcError
+
+
+def _hex_to_int(result: object, what: str) -> int:
+    """Parse a JSON-RPC hex-quantity result. A node that returns something that
+    isn't valid hex is a malformed response — raise RpcError, not a raw ValueError,
+    so callers catch one exception type for every chain fault."""
+    try:
+        return int(str(result), 16)
+    except (TypeError, ValueError) as exc:
+        raise RpcError(f"{what}: malformed result {result!r}") from exc
 
 # Function selectors (first 4 bytes of keccak(signature)).
 SEL_BALANCE_OF = "70a08231"
@@ -67,14 +77,14 @@ class TokenView:
 
     def balance_of(self, who: str) -> int:
         data = "0x" + SEL_BALANCE_OF + _slot_addr(who)
-        return int(self.rpc.eth_call(self.address, data), 16)
+        return _hex_to_int(self.rpc.eth_call(self.address, data), "balanceOf")
 
     def authorization_used(self, authorizer: str, nonce: str) -> bool:
         data = "0x" + SEL_AUTHORIZATION_STATE + _slot_addr(authorizer) + _slot_bytes32(nonce)
-        return int(self.rpc.eth_call(self.address, data), 16) == 1
+        return _hex_to_int(self.rpc.eth_call(self.address, data), "authorizationState") == 1
 
     def event_mode(self) -> int:
-        return int(self.rpc.eth_call(self.address, "0x" + SEL_EVENT_MODE), 16)
+        return _hex_to_int(self.rpc.eth_call(self.address, "0x" + SEL_EVENT_MODE), "eventMode")
 
     def authorization_used_logs(
         self, *, authorizer: str | None = None, from_block: int | str = "earliest"

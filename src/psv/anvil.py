@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import subprocess
 import time
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -37,9 +38,18 @@ def _urllib_transport(endpoint: str, timeout: float) -> Transport:
         req = urllib.request.Request(
             endpoint, data=data, headers={"Content-Type": "application/json"}
         )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (local Anvil only)
-            body: dict[str, Any] = json.loads(resp.read().decode())
-            return body
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (local Anvil)
+                raw = resp.read().decode()
+        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            # Node unreachable / refused / timed out — a transport failure, not our
+            # bug. Normalize to RpcError so every caller catches one exception type.
+            raise RpcError(f"transport failure contacting {endpoint}: {exc}") from exc
+        try:
+            body: dict[str, Any] = json.loads(raw)
+        except ValueError as exc:
+            raise RpcError(f"malformed (non-JSON) response from {endpoint}: {exc}") from exc
+        return body
 
     return send
 

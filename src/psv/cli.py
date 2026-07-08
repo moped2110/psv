@@ -18,7 +18,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from .anvil import RpcClient
+from .anvil import RpcClient, RpcError
 from .chain import TokenView
 from .divergence import Divergence
 from .rails import RailConfig, get_rail, reconcile_live, token_for_rail
@@ -119,17 +119,23 @@ def _cmd_reconcile(args: argparse.Namespace) -> int:
         return 2
 
     rpc = RpcClient(endpoint=str(args.rpc_url)) if args.rpc_url else RpcClient()
-    token = token_for_rail(rail, rpc)
-    report = run_reconcile(
-        token,
-        rail,
-        payer=str(args.payer),
-        payee=str(args.payee),
-        nonce=str(args.nonce),
-        payer_before=int(args.payer_before),
-        payee_before=int(args.payee_before),
-        sut_believes_paid=bool(args.sut_believes_paid),
-    )
+    try:
+        token = token_for_rail(rail, rpc)
+        report = run_reconcile(
+            token,
+            rail,
+            payer=str(args.payer),
+            payee=str(args.payee),
+            nonce=str(args.nonce),
+            payer_before=int(args.payer_before),
+            payee_before=int(args.payee_before),
+            sut_believes_paid=bool(args.sut_believes_paid),
+        )
+    except RpcError as exc:
+        # Chain unreachable / RPC error / malformed response — an environment fault,
+        # not a divergence. Exit 2 (usage/lookup) with a clean message, no traceback.
+        print(f"chain/RPC error: {exc}", file=sys.stderr)
+        return 2
 
     print(report.to_markdown())
     if args.json_out:
