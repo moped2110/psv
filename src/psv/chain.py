@@ -30,6 +30,7 @@ def _hex_to_int(result: object, what: str) -> int:
     except (TypeError, ValueError) as exc:
         raise RpcError(f"{what}: malformed result {result!r}") from exc
 
+
 # Function selectors (first 4 bytes of keccak(signature)).
 SEL_BALANCE_OF = "70a08231"
 SEL_AUTHORIZATION_STATE = "e94a0102"

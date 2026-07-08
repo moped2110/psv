@@ -68,12 +68,18 @@ def test_cli_reconcile_rpc_error_exits_2(monkeypatch: pytest.MonkeyPatch) -> Non
     rc = cli.main(
         [
             "reconcile",
-            "--rail", "usdc-base",
-            "--payer", "0x" + "11" * 20,
-            "--payee", "0x" + "22" * 20,
-            "--nonce", "0x" + "ab" * 32,
-            "--payer-before", "1000",
-            "--payee-before", "0",
+            "--rail",
+            "usdc-base",
+            "--payer",
+            "0x" + "11" * 20,
+            "--payee",
+            "0x" + "22" * 20,
+            "--nonce",
+            "0x" + "ab" * 32,
+            "--payer-before",
+            "1000",
+            "--payee-before",
+            "0",
             "--sut-paid",
         ]
     )
