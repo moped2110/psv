@@ -6,6 +6,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Differential testing** (`psv.differential`): drive one on-chain fact past several SUT beliefs
+  at once and flag the one that disagrees — on a single unambiguous settlement two correct systems
+  must agree, so a disagreement localises the faulty implementation. Offline test proves a
+  drifted-event SUT is caught as a SILENT_LOSS while the correct one stays consistent.
+- **On-chain scenarios** (`-m onchain`): **gas spike / stuck mempool** — a settlement that mines
+  late (automine off → later mined) produces no phantom credit while pending, then surfaces as a
+  SILENT_LOSS once mined against a confirm-without-waiting SUT; **facilitator crash mid-settlement**
+  — an authorization settled on-chain but never booked by the SUT is caught as a SILENT_LOSS.
+  (In-process SUT driving was already the harness pattern; these reuse it.)
 - **Run records (on by default)**: every `reconcile` writes a tamper-evident JSON run record
   (UTC timestamps, tool version, exact inputs, environment, full report, verdict, `runId` content
   hash) plus a `runs.jsonl` journal line — an audit trail beyond the console. Written to
