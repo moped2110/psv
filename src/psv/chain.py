@@ -46,17 +46,44 @@ TOPIC_TRANSFER_V2 = "0x58f9acac7a1c69c84dff9a713e28686566926c704ffaaa5562e8225bd
 TOPIC_AUTHORIZATION_USED = "0x98de503528ee59b575ef0c0a2576a82497bfc029a5685b209e9ec333479b10a5"
 
 
+_UINT256_MAX = 2**256 - 1
+
+
 def _slot_addr(addr: str) -> str:
-    """Left-pad a 20-byte address to a 32-byte ABI slot (hex, no 0x)."""
-    return addr.lower().removeprefix("0x").rjust(64, "0")
+    """Left-pad a 20-byte address to a 32-byte ABI slot (hex, no 0x).
+
+    A too-long or non-hex value would overflow the 32-byte word and silently
+    desync every following ABI slot, so reject it loudly instead."""
+    hexs = addr.lower().removeprefix("0x")
+    if len(hexs) > 40 or (hexs and not _is_hex(hexs)):
+        raise ValueError(f"not a 20-byte address: {addr!r}")
+    return hexs.rjust(64, "0")
 
 
 def _slot_uint(value: int) -> str:
+    """Encode a uint256 as a 32-byte ABI slot. Out-of-range values can't be
+    represented in 256 bits — encoding them anyway would corrupt the calldata
+    (a >64-hex word shifts everything after it), so raise instead."""
+    if not 0 <= value <= _UINT256_MAX:
+        raise ValueError(f"uint256 out of range: {value}")
     return f"{value:064x}"
 
 
 def _slot_bytes32(b: str) -> str:
-    return b.lower().removeprefix("0x").rjust(64, "0")
+    """Right-pad a bytes32 to a 32-byte ABI slot. Reject anything wider than 32
+    bytes or non-hex — it would overflow the word and desync the layout."""
+    hexs = b.lower().removeprefix("0x")
+    if len(hexs) > 64 or (hexs and not _is_hex(hexs)):
+        raise ValueError(f"not a bytes32 value: {b!r}")
+    return hexs.rjust(64, "0")
+
+
+def _is_hex(s: str) -> bool:
+    try:
+        int(s, 16)
+    except ValueError:
+        return False
+    return True
 
 
 def _topic_addr(addr: str) -> str:

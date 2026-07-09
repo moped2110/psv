@@ -40,3 +40,38 @@ jobs:
         run: pytest -q --cov --cov-fail-under=85
       - name: Type-check (mypy strict)
         run: mypy
+
+  # Real on-chain gate: spin up Anvil, deploy UpgradeableMockUSDC to its
+  # deterministic address, and run the `-m onchain` suite (settlement, ABI drift,
+  # reconciliation, reorg, ...). Mirrors docs/SETUP-onchain.md. Public Anvil dev
+  # keys only — local test funds, never mainnet.
+  onchain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Foundry (anvil + forge + cast)
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Start Anvil (chain-id must match the signing domain)
+        run: |
+          anvil --chain-id 84532 --silent &
+          for _ in $(seq 1 40); do
+            if cast block-number --rpc-url http://127.0.0.1:8545 >/dev/null 2>&1; then
+              echo "anvil is up"; break
+            fi
+            sleep 0.5
+          done
+      - name: Deploy UpgradeableMockUSDC (deployer nonce 0 → deterministic address)
+        working-directory: onchain
+        run: |
+          forge create src/UpgradeableMockUSDC.sol:UpgradeableMockUSDC \
+            --rpc-url http://127.0.0.1:8545 \
+            --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+            --broadcast
+      - name: On-chain tests (-m onchain)
+        run: pytest -q -m onchain
