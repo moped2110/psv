@@ -32,3 +32,6 @@ onchain/broadcast/
 *.anvil
 anvil-state.json
 .coverage
+
+# Default run-record directory (audit trail of runs) — machine-local, not tracked.
+psv-runs/

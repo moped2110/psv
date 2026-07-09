@@ -127,3 +127,128 @@ def test_cli_log_dir_writes_record(monkeypatch: Any, tmp_path) -> None:
     assert len(records) == 1
     assert (tmp_path / "runs.jsonl").exists()
     assert verify_run_record(json.loads(records[0].read_text())) is True
+
+
+def test_cli_logging_on_by_default(monkeypatch: Any, tmp_path) -> None:
+    token = _fake_token({PAYER.lower(): 900, PAYEE.lower(): 100}, nonce_used=True)
+    monkeypatch.setattr("psv.cli.token_for_rail", lambda rail, rpc: token)
+    monkeypatch.delenv("PSV_NO_LOG", raising=False)
+    monkeypatch.chdir(tmp_path)
+    code = main(
+        [
+            "reconcile",
+            "--rail",
+            "eurc-base",
+            "--payer",
+            PAYER,
+            "--payee",
+            PAYEE,
+            "--nonce",
+            NONCE,
+            "--payer-before",
+            "1000",
+            "--payee-before",
+            "0",
+            "--sut-paid",
+        ]
+    )
+    assert code == 0  # consistent_paid
+    assert (tmp_path / "psv-runs" / "runs.jsonl").exists()
+    assert list((tmp_path / "psv-runs").glob("run-*.json"))
+
+
+def test_cli_no_log_suppresses(monkeypatch: Any, tmp_path) -> None:
+    token = _fake_token({PAYER.lower(): 900, PAYEE.lower(): 100}, nonce_used=True)
+    monkeypatch.setattr("psv.cli.token_for_rail", lambda rail, rpc: token)
+    monkeypatch.delenv("PSV_NO_LOG", raising=False)
+    monkeypatch.chdir(tmp_path)
+    code = main(
+        [
+            "reconcile",
+            "--rail",
+            "eurc-base",
+            "--payer",
+            PAYER,
+            "--payee",
+            PAYEE,
+            "--nonce",
+            NONCE,
+            "--payer-before",
+            "1000",
+            "--payee-before",
+            "0",
+            "--sut-paid",
+            "--no-log",
+        ]
+    )
+    assert code == 0
+    assert not (tmp_path / "psv-runs").exists()
+
+
+def test_cli_rpc_error_is_logged(monkeypatch: Any, tmp_path) -> None:
+    from psv.anvil import RpcError
+
+    def boom(rail, rpc):
+        raise RpcError("no route to chain")
+
+    monkeypatch.setattr("psv.cli.token_for_rail", boom)
+    code = main(
+        [
+            "reconcile",
+            "--rail",
+            "eurc-base",
+            "--payer",
+            PAYER,
+            "--payee",
+            PAYEE,
+            "--nonce",
+            NONCE,
+            "--payer-before",
+            "1000",
+            "--payee-before",
+            "0",
+            "--sut-paid",
+            "--log-dir",
+            str(tmp_path),
+        ]
+    )
+    assert code == 2
+    records = list(tmp_path.glob("run-*.json"))
+    assert len(records) == 1
+    rec = json.loads(records[0].read_text())
+    assert rec["error"].startswith("chain/RPC error")
+    assert rec["exitCode"] == 2
+    assert rec["consistent"] is False
+    assert rec["report"] is None
+    assert verify_run_record(rec) is True
+
+
+def test_cli_invalid_address_is_logged_not_crashed(monkeypatch: Any, tmp_path) -> None:
+    # A malformed address must not escape as a traceback — it's a clean exit 2,
+    # recorded as a failed run.
+    token = _fake_token({}, nonce_used=False)
+    monkeypatch.setattr("psv.cli.token_for_rail", lambda rail, rpc: token)
+    code = main(
+        [
+            "reconcile",
+            "--rail",
+            "eurc-base",
+            "--payer",
+            "0xNOTHEX",
+            "--payee",
+            PAYEE,
+            "--nonce",
+            NONCE,
+            "--payer-before",
+            "0",
+            "--payee-before",
+            "0",
+            "--sut-unpaid",
+            "--log-dir",
+            str(tmp_path),
+        ]
+    )
+    assert code == 2
+    rec = json.loads(next(tmp_path.glob("run-*.json")).read_text())
+    assert rec["error"].startswith("invalid input")
+    assert rec["exitCode"] == 2

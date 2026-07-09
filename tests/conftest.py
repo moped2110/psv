@@ -18,6 +18,16 @@ from typing import Any
 
 import pytest
 
+from psv.run_record import NO_LOG_ENV
+
+
+@pytest.fixture(autouse=True)
+def _suppress_default_run_log(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run logging is on by default and would litter ./psv-runs during CLI tests.
+    Suppress the *default* dir; a test passing an explicit --log-dir still writes."""
+    monkeypatch.setenv(NO_LOG_ENV, "1")
+
+
 # Standard, PUBLIC Anvil dev accounts (test-only, documented everywhere).
 ANVIL_ACCOUNTS = {
     "deployer": (

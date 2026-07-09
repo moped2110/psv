@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -25,6 +26,7 @@ from .chain import TokenView
 from .divergence import Divergence
 from .rails import RailConfig, get_rail, reconcile_live, token_for_rail
 from .report import ReconReport, exit_code
+from .run_record import DEFAULT_LOG_DIR, NO_LOG_ENV
 
 
 def run_reconcile(
@@ -114,19 +116,65 @@ def _build_parser() -> argparse.ArgumentParser:
         "--log-dir",
         dest="log_dir",
         default=None,
-        help="Persist a tamper-evident JSON run record (timestamp, inputs, environment, "
-        "full report, verdict, content hash) here and append a line to runs.jsonl.",
+        help="Directory for the tamper-evident JSON run record + runs.jsonl journal. "
+        "Logging is ON by default (writes to ./psv-runs); use this to change the path.",
+    )
+    r.add_argument(
+        "--no-log",
+        dest="no_log",
+        action="store_true",
+        help="Disable the run record for this run (logging is on by default).",
     )
     return parser
 
 
+def _resolve_log_dir(args: argparse.Namespace) -> Path | None:
+    """Logging is on by default (./psv-runs). --no-log or the NO_LOG_ENV env var
+    (used by tests) suppresses the default; an explicit --log-dir always writes."""
+    if args.no_log:
+        return None
+    if args.log_dir:
+        return Path(str(args.log_dir))
+    if os.environ.get(NO_LOG_ENV):
+        return None
+    return Path(DEFAULT_LOG_DIR)
+
+
 def _cmd_reconcile(args: argparse.Namespace) -> int:
     started_at = datetime.now(UTC)
+    log_dir = _resolve_log_dir(args)
+    inputs = {
+        "rail": str(args.rail),
+        "payer": str(args.payer),
+        "payee": str(args.payee),
+        "nonce": str(args.nonce),
+        "payer_before": int(args.payer_before),
+        "payee_before": int(args.payee_before),
+        "sut_believes_paid": bool(args.sut_believes_paid),
+        "rpc_url": args.rpc_url,
+    }
+
+    def _write(report: dict[str, object] | None, code: int, error: str | None = None) -> None:
+        if log_dir is None:
+            return
+        from .run_record import build_run_record, write_run_record
+
+        record = build_run_record(
+            command="reconcile",
+            inputs=inputs,
+            report=report,
+            exit_code=code,
+            started_at=started_at,
+            finished_at=datetime.now(UTC),
+            error=error,
+        )
+        print(f"Run record: {write_run_record(record, log_dir)}")
+
     try:
         rail = get_rail(str(args.rail))
     except KeyError as exc:
         print(str(exc), file=sys.stderr)
-        return 2
+        return 2  # bad --rail arg (usage error) — not a run, not logged
 
     rpc = RpcClient(endpoint=str(args.rpc_url)) if args.rpc_url else RpcClient()
     try:
@@ -143,8 +191,15 @@ def _cmd_reconcile(args: argparse.Namespace) -> int:
         )
     except RpcError as exc:
         # Chain unreachable / RPC error / malformed response — an environment fault,
-        # not a divergence. Exit 2 (usage/lookup) with a clean message, no traceback.
+        # not a divergence. Record the failed attempt, then exit 2 with a clean message.
+        _write(None, 2, error=f"chain/RPC error: {exc}")
         print(f"chain/RPC error: {exc}", file=sys.stderr)
+        return 2
+    except ValueError as exc:
+        # Malformed input (e.g. a bad address or non-32-byte nonce caught by the ABI
+        # slot encoders) — a usage error, not a crash. Record it and exit 2 cleanly.
+        _write(None, 2, error=f"invalid input: {exc}")
+        print(f"invalid input: {exc}", file=sys.stderr)
         return 2
 
     print(report.to_markdown())
@@ -156,28 +211,7 @@ def _cmd_reconcile(args: argparse.Namespace) -> int:
         print(f"Markdown report: {args.md_out}")
 
     code = exit_code(report)
-    if args.log_dir:
-        from .run_record import build_run_record, write_run_record
-
-        record = build_run_record(
-            command="reconcile",
-            inputs={
-                "rail": str(args.rail),
-                "payer": str(args.payer),
-                "payee": str(args.payee),
-                "nonce": str(args.nonce),
-                "payer_before": int(args.payer_before),
-                "payee_before": int(args.payee_before),
-                "sut_believes_paid": bool(args.sut_believes_paid),
-                "rpc_url": args.rpc_url,
-            },
-            report=json.loads(report.to_json()),
-            exit_code=code,
-            started_at=started_at,
-            finished_at=datetime.now(UTC),
-        )
-        path = write_run_record(record, Path(str(args.log_dir)))
-        print(f"Run record: {path}")
+    _write(json.loads(report.to_json()), code)
     return code
 
 

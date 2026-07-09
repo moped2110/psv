@@ -6,11 +6,15 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
-- **`reconcile --log-dir`**: persist a tamper-evident JSON run record per run (UTC timestamps,
-  tool version, exact inputs, environment, full report, verdict, `runId` content hash) plus a
-  `runs.jsonl` journal line — an audit trail beyond the console. No secrets: `rpc_url` is reduced
-  to scheme+host so a provider key in its path/query can't leak (psv holds no signing keys at all).
-  `verify_run_record()` re-hashes a record to detect tampering.
+- **Run records (on by default)**: every `reconcile` writes a tamper-evident JSON run record
+  (UTC timestamps, tool version, exact inputs, environment, full report, verdict, `runId` content
+  hash) plus a `runs.jsonl` journal line — an audit trail beyond the console. Written to
+  `./psv-runs` by default; `--log-dir` changes the path, `--no-log` (or the `PSV_NO_LOG` env var)
+  disables it. **A failed run is recorded too** (with an `error` field, exit code 2, null report):
+  a chain/RPC-unreachable run, or malformed input (e.g. a bad address / non-32-byte nonce caught
+  by the ABI slot encoders) — the latter now exits 2 cleanly instead of dumping a traceback. No secrets: `rpc_url` is reduced to scheme+host so a provider
+  key in its path/query can't leak (psv holds no signing keys at all). `verify_run_record()`
+  re-hashes a record to detect tampering.
 
 ## [0.1.0] — 2026-07-09
 

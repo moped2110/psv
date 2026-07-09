@@ -25,6 +25,13 @@ from . import __version__
 
 SCHEMA_VERSION = "1.0"
 
+#: Default directory for run records (relative to the current working dir). Logging
+#: is on by default; disable per run with ``--no-log`` or the env var below.
+DEFAULT_LOG_DIR = "psv-runs"
+#: Set this env var (to anything) to suppress the *default* run log — an explicit
+#: ``--log-dir`` still writes. Used by the test suite to avoid polluting the tree.
+NO_LOG_ENV = "PSV_NO_LOG"
+
 
 def _redact_url(url: str | None) -> str | None:
     """Keep only scheme://host of an RPC URL — providers embed API keys in the
@@ -67,12 +74,18 @@ def build_run_record(
     *,
     command: str,
     inputs: dict[str, Any],
-    report: dict[str, Any],
+    report: dict[str, Any] | None,
     exit_code: int,
     started_at: datetime,
     finished_at: datetime,
+    error: str | None = None,
 ) -> dict[str, Any]:
-    """Assemble the full, self-describing record for one run (adds ``runId``)."""
+    """Assemble the full, self-describing record for one run (adds ``runId``).
+
+    A run that produced no report — e.g. the chain/RPC was unreachable — is still
+    recorded: pass ``error`` (a message) and the exit code (2). Such a run is never
+    ``consistent`` and its ``report`` is null.
+    """
     record: dict[str, Any] = {
         "schemaVersion": SCHEMA_VERSION,
         "tool": {"name": "psv", "version": __version__},
@@ -88,7 +101,8 @@ def build_run_record(
         },
         "report": report,
         "exitCode": exit_code,
-        "consistent": exit_code == 0,
+        "consistent": error is None and exit_code == 0,
+        "error": error,
     }
     record["runId"] = _content_hash(record)
     return record
