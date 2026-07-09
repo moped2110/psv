@@ -5,6 +5,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- **`reconcile --log-dir`**: persist a tamper-evident JSON run record per run (UTC timestamps,
+  tool version, exact inputs, environment, full report, verdict, `runId` content hash) plus a
+  `runs.jsonl` journal line — an audit trail beyond the console. No secrets: `rpc_url` is reduced
+  to scheme+host so a provider key in its path/query can't leak (psv holds no signing keys at all).
+  `verify_run_record()` re-hashes a record to detect tampering.
+
 ## [0.1.0] — 2026-07-09
 
 First release. A system-level verification harness for complete x402 payment

@@ -15,7 +15,9 @@ Stdlib argparse (psv core stays dependency-light). Exit code 0 = consistent,
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .anvil import RpcClient, RpcError
@@ -108,10 +110,18 @@ def _build_parser() -> argparse.ArgumentParser:
     r.add_argument(
         "--markdown", dest="md_out", default=None, help="Write the Markdown report to this path"
     )
+    r.add_argument(
+        "--log-dir",
+        dest="log_dir",
+        default=None,
+        help="Persist a tamper-evident JSON run record (timestamp, inputs, environment, "
+        "full report, verdict, content hash) here and append a line to runs.jsonl.",
+    )
     return parser
 
 
 def _cmd_reconcile(args: argparse.Namespace) -> int:
+    started_at = datetime.now(UTC)
     try:
         rail = get_rail(str(args.rail))
     except KeyError as exc:
@@ -144,7 +154,31 @@ def _cmd_reconcile(args: argparse.Namespace) -> int:
     if args.md_out:
         Path(str(args.md_out)).write_text(report.to_markdown(), encoding="utf-8")
         print(f"Markdown report: {args.md_out}")
-    return exit_code(report)
+
+    code = exit_code(report)
+    if args.log_dir:
+        from .run_record import build_run_record, write_run_record
+
+        record = build_run_record(
+            command="reconcile",
+            inputs={
+                "rail": str(args.rail),
+                "payer": str(args.payer),
+                "payee": str(args.payee),
+                "nonce": str(args.nonce),
+                "payer_before": int(args.payer_before),
+                "payee_before": int(args.payee_before),
+                "sut_believes_paid": bool(args.sut_believes_paid),
+                "rpc_url": args.rpc_url,
+            },
+            report=json.loads(report.to_json()),
+            exit_code=code,
+            started_at=started_at,
+            finished_at=datetime.now(UTC),
+        )
+        path = write_run_record(record, Path(str(args.log_dir)))
+        print(f"Run record: {path}")
+    return code
 
 
 def main(argv: list[str] | None = None) -> int:
