@@ -258,7 +258,7 @@ def create_app(config: SutConfig) -> Any:
     from fastapi.responses import JSONResponse
 
     sut = ReferenceSut(config)
-    app = FastAPI(title="psv reference SUT", version="0.0.1")
+    app = FastAPI(title="psv reference SUT", version="0.1.0")
 
     @app.post("/quote")
     def quote() -> dict[str, Any]:

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "psv"
-version = "0.0.1"
+version = "0.1.0"
 description = "System-level verification harness for complete x402 payment systems (settlement, RPC, reconciliation, load)."
 readme = "README.md"
 requires-python = ">=3.11"

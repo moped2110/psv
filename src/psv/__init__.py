@@ -16,7 +16,7 @@ are exactly the failures (vanished payments, double credits, reorg blindness)
 that black-box conformance cannot see.
 """
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 
 # Pinned reference deployment used across the harness.
 # Anvil's first account deploys deterministically to this address.
