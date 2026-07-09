@@ -37,11 +37,18 @@ def _addr_from_topic(topic: str) -> str:
 
 @dataclass(frozen=True)
 class OnChainCredit:
-    """A settlement observed on-chain: funds ``value`` from ``payer`` in ``tx_hash``."""
+    """A settlement observed on-chain: funds ``value`` from ``payer`` in ``tx_hash``.
+
+    ``asset`` is the emitting token contract (the log's ``address``). It lets a
+    multi-asset merchant attribute each credit to the right token — two payments
+    of equal value in different assets are distinct records, and reconciliation
+    of one asset never marks another asset's credit as accounted for.
+    """
 
     payer: str
     value: int
     tx_hash: str
+    asset: str = ""
 
     @property
     def payer_norm(self) -> str:
@@ -56,10 +63,12 @@ def decode_transfer_log(log: dict[str, object]) -> OnChainCredit:
     raw = log.get("data", "0x")
     data = raw if isinstance(raw, str) else "0x"
     tx = log.get("transactionHash", "")
+    asset = log.get("address", "")
     return OnChainCredit(
         payer=_addr_from_topic(str(topics[1])),
         value=int(data, 16) if data not in ("", "0x") else 0,
         tx_hash=str(tx).lower(),
+        asset=str(asset).lower(),
     )
 
 
