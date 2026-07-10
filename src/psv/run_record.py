@@ -129,6 +129,9 @@ def write_run_record(record: dict[str, Any], log_dir: Path) -> Path:
         "command": record["command"],
         "consistent": record["consistent"],
         "exitCode": record["exitCode"],
+        # Surface the reason for an exit-2 run in the index too (parity with #01,
+        # T-22) so an unreachable/RPC-failed run is greppable without the full file.
+        "error": record["error"],
         "file": path.name,
     }
     with (log_dir / "runs.jsonl").open("a", encoding="utf-8") as fh:

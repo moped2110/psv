@@ -79,6 +79,9 @@ def test_write_record_file_and_journal(tmp_path) -> None:
     line = json.loads((tmp_path / "runs.jsonl").read_text().strip())
     assert line["runId"] == rec["runId"]
     assert line["consistent"] is False
+    # The journal must carry the verdict + reason (T-22 parity with #01).
+    assert line["exitCode"] == 1
+    assert line["error"] is None
 
 
 def _fake_token(balances: dict[str, int], nonce_used: bool):
