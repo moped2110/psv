@@ -19,7 +19,7 @@ import pytest
 from conftest import ANVIL_ACCOUNTS, DEFAULT_CHAIN_ID, DEFAULT_RPC, DEFAULT_TOKEN, send_tx
 
 from psv.chain import TokenView
-from psv.load import run_profile
+from psv.load import FacilitatorTaskPool, run_profile, run_staged_profile, standard_profile
 from psv.payloads import EvmSigner, sign_authorization
 from psv.reference_sut.server import ReferenceSut, SutConfig
 
@@ -72,3 +72,56 @@ def test_sequential_settlement_throughput(rpc: Any, funded_token: TokenView) -> 
     assert token.balance_of(merchant) - merchant_before == N * amount  # each settled once
     assert res.throughput_per_s > 0
     assert res.p50_ms > 0 and res.max_ms >= res.p95_ms >= res.p50_ms
+
+
+def test_concurrent_facilitator_pool_ramp_spike_soak_breakpoint_recovery(
+    rpc: Any, funded_token: TokenView
+) -> None:
+    from eth_account import Account
+
+    Account.enable_unaudited_hdwallet_features()
+    mnemonic = "test test test test test test test test test test test junk"
+    facilitator_indices = (0, 3, 4, 5, 6, 7, 8, 9)
+    suts = [
+        ReferenceSut(
+            SutConfig(
+                token_address=DEFAULT_TOKEN,
+                merchant_address=ANVIL_ACCOUNTS["merchant"][0],
+                facilitator_key=Account.from_mnemonic(
+                    mnemonic, account_path=f"m/44'/60'/0'/0/{index}"
+                ).key.to_0x_hex(),
+                chain_id=DEFAULT_CHAIN_ID,
+                rpc_endpoint=DEFAULT_RPC,
+            )
+        )
+        for index in facilitator_indices
+    ]
+    payer = EvmSigner.from_key(ANVIL_ACCOUNTS["payer"][1])
+    merchant = ANVIL_ACCOUNTS["merchant"][0]
+    amount = suts[0].config.price
+    merchant_before = funded_token.balance_of(merchant)
+
+    def worker(sut: ReferenceSut):
+        def settle(_: int) -> None:
+            quote = sut.quote()
+            authorization = sign_authorization(
+                signer=payer,
+                to=merchant,
+                value=amount,
+                chain_id=DEFAULT_CHAIN_ID,
+                token_address=DEFAULT_TOKEN,
+                token_name="USDC",
+                token_version="2",
+            )
+            assert sut.pay(quote["order_id"], authorization.as_dict())["settled"] is True
+
+        return settle
+
+    pool = FacilitatorTaskPool(tuple(worker(sut) for sut in suts))
+    result = run_staged_profile(pool, standard_profile(scale=8, peak_concurrency=4))
+
+    assert result.errors == 0
+    assert result.ok == result.total == 72
+    assert result.recovered is True
+    assert funded_token.balance_of(merchant) - merchant_before == result.ok * amount
+    assert result.as_dict()["correctness"]["successful"] == 72

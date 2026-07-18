@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/moped2110/psv/schemas/reconciliation-report-v2.json",
+  "title": "psv reconciliation report v2",
+  "description": "Version 2 adds exact transaction/log provenance, pinned block evidence, finality, balances, required/received amounts, stable reason codes, and an explicit privacy policy. Version 1 consumers must migrate to the nested evidence object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "reportVersion", "tool", "generatedAt", "privacy", "rail", "payment", "evidence", "divergence"],
+  "properties": {
+    "$schema": {"const": "https://github.com/moped2110/psv/schemas/reconciliation-report-v2.json"},
+    "reportVersion": {"const": "2.0"},
+    "generatedAt": {"type": "string", "format": "date-time"},
+    "tool": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "mode", "readOnly"],
+      "properties": {"name": {"const": "psv"}, "mode": {"const": "reconcile"}, "readOnly": {"const": true}}
+    },
+    "privacy": {
+      "type": "object", "additionalProperties": false, "required": ["policy"],
+      "properties": {"policy": {"type": "string", "minLength": 1}}
+    },
+    "rail": {
+      "type": "object", "additionalProperties": false, "required": ["key", "label", "chainId", "token"],
+      "properties": {
+        "key": {"type": "string", "minLength": 1}, "label": {"type": "string", "minLength": 1},
+        "chainId": {"type": "integer", "minimum": 1}, "token": {"$ref": "#/$defs/address"}
+      }
+    },
+    "payment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["payer", "payee", "nonce", "sutBelievesPaid", "requiredAmount", "receivedAmount"],
+      "properties": {
+        "payer": {"$ref": "#/$defs/address"}, "payee": {"$ref": "#/$defs/address"},
+        "nonce": {"$ref": "#/$defs/hash"}, "sutBelievesPaid": {"type": "boolean"},
+        "requiredAmount": {"$ref": "#/$defs/positiveUint256"}, "receivedAmount": {"$ref": "#/$defs/uint256"}
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["chainId", "finalityBlock", "settlementBlock", "transaction", "token", "authorization", "balances"],
+      "properties": {
+        "chainId": {"type": "integer", "minimum": 1},
+        "finalityBlock": {"$ref": "#/$defs/finalityBlock"}, "settlementBlock": {"$ref": "#/$defs/block"},
+        "transaction": {"$ref": "#/$defs/transaction"}, "token": {"$ref": "#/$defs/token"},
+        "authorization": {"$ref": "#/$defs/authorization"}, "balances": {"$ref": "#/$defs/balances"}
+      }
+    },
+    "divergence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "severity", "reasonCode", "message", "isFailure"],
+      "properties": {
+        "kind": {"enum": ["consistent_paid", "consistent_unpaid", "silent_loss", "phantom_credit", "underpaid_credit"]},
+        "severity": {"enum": ["ok", "critical"]}, "reasonCode": {"type": "string", "pattern": "^PSV-RECON-[A-Z-]+$"},
+        "message": {"type": "string", "minLength": 1}, "isFailure": {"type": "boolean"}
+      }
+    }
+  },
+  "$defs": {
+    "address": {"type": "string", "pattern": "^0x[0-9a-f]{40}$"},
+    "hash": {"type": "string", "pattern": "^0x[0-9a-f]{64}$"},
+    "uint256": {"type": "integer", "minimum": 0, "maximum": 115792089237316195423570985008687907853269984665640564039457584007913129639935},
+    "positiveUint256": {"type": "integer", "minimum": 1, "maximum": 115792089237316195423570985008687907853269984665640564039457584007913129639935},
+    "block": {
+      "type": "object", "additionalProperties": false, "required": ["number", "hash"],
+      "properties": {"number": {"$ref": "#/$defs/uint256"}, "hash": {"$ref": "#/$defs/hash"}}
+    },
+    "finalityBlock": {
+      "type": "object", "additionalProperties": false, "required": ["number", "hash", "tag", "confirmations"],
+      "properties": {"number": {"$ref": "#/$defs/uint256"}, "hash": {"$ref": "#/$defs/hash"}, "tag": {"enum": ["latest", "safe", "finalized"]}, "confirmations": {"type": "integer", "minimum": 1}}
+    },
+    "transaction": {
+      "type": "object", "additionalProperties": false,
+      "required": ["hash", "receiptStatus", "logIndex", "authorizationLogIndex", "removed"],
+      "properties": {"hash": {"$ref": "#/$defs/hash"}, "receiptStatus": {"enum": [0, 1]}, "logIndex": {"type": ["integer", "null"], "minimum": 0}, "authorizationLogIndex": {"type": ["integer", "null"], "minimum": 0}, "removed": {"type": "boolean"}}
+    },
+    "token": {
+      "type": "object", "additionalProperties": false,
+      "required": ["address", "codeSha256", "implementationAddress", "implementationCodeSha256", "railAttestationVersion"],
+      "properties": {
+        "address": {"$ref": "#/$defs/address"},
+        "codeSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "implementationAddress": {"anyOf": [{"$ref": "#/$defs/address"}, {"type": "null"}]},
+        "implementationCodeSha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "railAttestationVersion": {"type": "string", "minLength": 1}
+      }
+    },
+    "authorization": {
+      "type": "object", "additionalProperties": false,
+      "required": ["payer", "payee", "nonce", "nonceConsumed", "eventValue"],
+      "properties": {"payer": {"$ref": "#/$defs/address"}, "payee": {"$ref": "#/$defs/address"}, "nonce": {"$ref": "#/$defs/hash"}, "nonceConsumed": {"type": "boolean"}, "eventValue": {"type": ["integer", "null"], "minimum": 0}}
+    },
+    "balances": {
+      "type": "object", "additionalProperties": false,
+      "required": ["payerBefore", "payerAfter", "payeeBefore", "payeeAfter", "requiredAmount", "receivedAmount"],
+      "properties": {"payerBefore": {"$ref": "#/$defs/uint256"}, "payerAfter": {"$ref": "#/$defs/uint256"}, "payeeBefore": {"$ref": "#/$defs/uint256"}, "payeeAfter": {"$ref": "#/$defs/uint256"}, "requiredAmount": {"$ref": "#/$defs/positiveUint256"}, "receivedAmount": {"$ref": "#/$defs/uint256"}}
+    }
+  }
+}

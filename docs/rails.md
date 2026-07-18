@@ -1,52 +1,80 @@
-# Rails — multi-asset reconciliation (USDC / JPYC / EURC)
+# Attested payment rails
 
-The harness's chain-truth oracle (`psv.chain.TokenView`) and divergence detector
-are rail-agnostic: `balanceOf`, `authorizationState` and the `AuthorizationUsed`
-log are standard across every EIP-3009 token. `psv.rails` pins the constants for
-the rails we care about so the *same* harness reconciles any of them.
+`psv.rails` reconciles one exact EIP-3009 settlement against read-only chain
+evidence. It never signs or submits a transaction on a public rail. Every
+`RailConfig` therefore has `signing_enabled=False`, including rails whose domain
+metadata is known.
 
-## Known rails (`psv.rails.KNOWN_RAILS`)
+## Registry
 
-| key | asset | chain | decimals | EIP-712 domain |
-|---|---|---|---|---|
-| `mock-anvil` | Local MockUSDC | Anvil 84532 | 6 | `USDC` / `2` |
-| `usdc-base` | USDC | Base 8453 | 6 | `USD Coin` / `2` |
-| `jpyc-polygon` | JPYC | Polygon 137 | 18 | `JPY Coin` / `1` |
-| `eurc-base` | **EURC** | Base 8453 | 6 | _unset — verify before signing_ |
+| Key | Network | Token | Decimals | Finality tag | Runtime status |
+|---|---:|---|---:|---|---|
+| `mock-anvil` | local 84532 | MockUSDC | 6 | `latest` | calibrated test fixture |
+| `usdc-base` | Base 8453 | USDC | 6 | `finalized` | calibrated read-only |
+| `eurc-base` | Base 8453 | EURC | 6 | `finalized` | calibrated read-only |
+| `jpyc-polygon` | Polygon 137 | JPYC | 18 | `finalized` | uncalibrated; fails closed |
 
-**EURC is the MiCA-era EUR rail.** Circle's EURC implements EIP-3009
-`transferWithAuthorization` natively and is served by the CDP facilitator, so it
-rides the same `exact/eip3009` path as USDC — no special facilitator. The
-6-vs-18 decimals split (USDC/EURC = 6, JPYC = 18) is itself the decimals damage
-case (`psv.token_quirks`).
+The Base attestations were reviewed on 2026-07-18 against finalized block
+`48,783,151`. They pin the token address, proxy runtime hash, implementation
+slot, implementation address, implementation runtime hash, expected decimals,
+interface, and authoritative sources. The JPYC address and metadata remain in
+the registry for planned calibration, but live reconciliation is rejected until
+the equivalent code/proxy identity is pinned.
 
-## Read-only — the money invariant holds
+Authoritative metadata sources:
 
-`reconcile_live(token, payer=…, payee=…, nonce=…, payer_before=…, payee_before=…,
-sut_believes_paid=…)` **only reads** the chain (balances + whether the EIP-3009
-nonce was consumed) and compares it to what the system believes, returning a
-`Divergence` (`consistent_paid` / `phantom_credit` / `silent_loss` /
-`underpaid_credit`). It **never
-signs or settles** on a real rail — outbound value stays testnet/Anvil only. A
-`RailConfig`'s EIP-712 domain (`token_name`/`token_version`) is therefore needed
-only for the local Anvil *signing* path; live read-only reconciliation ignores it,
-which is why `eurc-base` ships with the domain unset (verify on-chain before any
-signing use).
+- [Circle USDC contract addresses](https://developers.circle.com/stablecoins/usdc-contract-addresses)
+- [Circle EURC contract addresses](https://developers.circle.com/stablecoins/eurc-contract-addresses)
+- [JPYC contract notice](https://corporate.jpyc.co.jp/news/posts/Notice)
+- [EIP-3009](https://eips.ethereum.org/EIPS/eip-3009)
 
-```python
-from psv.anvil import RpcClient
-from psv.rails import get_rail, token_for_rail, reconcile_live
+## Read-only drift check
 
-rail = get_rail("eurc-base")
-token = token_for_rail(rail, RpcClient(endpoint="https://mainnet.base.org"))
-# snapshot balances before the payment, then after settlement reconcile read-only:
-d = reconcile_live(token, payer=payer, payee=merchant, nonce=nonce,
-                   payer_before=p0, payee_before=m0, sut_believes_paid=claimed)
-if d.is_failure:
-    print(d.message)   # phantom_credit / silent_loss
+The drift check validates the RPC chain, reviewed block anchor, safe/finalized
+block, token and implementation bytecode, proxy implementation, and callable
+read interface. It returns exit 0 on a match, 1 on drift or an uncalibrated rail,
+and 2 on an RPC or input failure.
+
+```bash
+psv rail-drift --rail usdc-base --rpc-url https://mainnet.base.org
+psv rail-drift --rail eurc-base --rpc-url https://mainnet.base.org
 ```
 
-Offline-tested in `tests/test_rails_unit.py` (registry + all three divergence
-outcomes over a fake JSON-RPC transport). A live Polygon/Base reconciliation run is
-the next step (P-11 Stage 2), using a per-chain `safe_window_seconds` for finality
-(Polygon ≈ 120s, checkpoint-based) rather than a fixed confirmation count.
+CI runs both Base observations on a schedule. The job is deliberately absent
+from pull-request gates so external RPC availability cannot make offline changes
+flaky. JPYC is not scheduled while its attestation is incomplete.
+
+## Exact reconciliation
+
+`psv reconcile` binds the verdict to one transaction, one log index, one
+authorization nonce, one token, and one payer/payee pair. It verifies the chain
+ID and runtime attestation, reads a canonical receipt, checks both Transfer and
+AuthorizationUsed evidence, pins parent/settlement/finality blocks, rejects
+same-block transfer races and removed logs, then compares the exact received
+amount with the invoice amount and the SUT belief.
+
+```bash
+psv reconcile \
+  --rail mock-anvil \
+  --payer 0x1111111111111111111111111111111111111111 \
+  --payee 0x2222222222222222222222222222222222222222 \
+  --nonce 0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  --tx-hash 0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  --log-index 0 \
+  --required-amount 1000000 \
+  --payer-before 5000000 \
+  --payee-before 0 \
+  --sut-paid \
+  --rpc-url http://127.0.0.1:8545
+```
+
+Reports use contract version 2.0 and include the full evidence needed to
+reproduce a verdict. Run records use schema version 1.1 and an integrity
+checksum; the checksum detects corruption or editing but is not a signature or
+an external trust anchor.
+
+## Limits
+
+A green result proves only the registered scenario and evidence contract. It
+does not certify an entire payment system, legal compliance, or economic safety.
+See [support-matrix.md](support-matrix.md) for the enforced scenario registry.

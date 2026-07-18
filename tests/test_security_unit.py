@@ -80,6 +80,11 @@ def test_asset_scoping_rejects_fake_token() -> None:
     assert asset_matches(TOKEN.lower(), TOKEN.upper()) is True  # case-insensitive
 
 
+def test_asset_scoping_rejects_malformed_addresses() -> None:
+    with pytest.raises(ValueError):
+        asset_matches("garbage", TOKEN)
+
+
 def test_binds_to_chain_false_on_unrecoverable_signature() -> None:
     # A malformed signature makes recovery raise; the guard must fail closed
     # (return False), never leak the exception to the caller.

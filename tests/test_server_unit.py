@@ -14,7 +14,7 @@ import pytest
 pytest.importorskip("eth_account")
 
 from psv.reconciliation import TOPIC_TRANSFER, topic_addr
-from psv.reference_sut.server import ReferenceSut, SutConfig, _Order
+from psv.reference_sut.server import ReferenceSut, SutConfig, _Order, create_app
 
 DEPLOYER_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 TOKEN = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
@@ -45,10 +45,17 @@ def make_sut(*, logs: list[dict[str, Any]] | None = None, **cfg: Any) -> Referen
 
 
 def _transfer(value: int, tx: str, payer: str = PAYER) -> dict[str, Any]:
+    tx_hash = "0x" + tx.removeprefix("0x").lower().rjust(64, "0")
     return {
+        "address": TOKEN,
         "topics": [TOPIC_TRANSFER, topic_addr(payer), topic_addr(MERCHANT)],
-        "data": hex(value),
-        "transactionHash": tx,
+        "data": "0x" + f"{value:064x}",
+        "transactionHash": tx_hash,
+        "transactionIndex": "0x0",
+        "blockNumber": "0x64",
+        "blockHash": "0x" + "cc" * 32,
+        "logIndex": "0x0",
+        "removed": False,
     }
 
 
@@ -62,6 +69,17 @@ def test_quote_shape_and_storage() -> None:
     assert q["extra"] == {"name": "USDC", "version": "2"}
     assert q["expires_at"] > int(time.time())
     assert q["order_id"] in sut.orders
+
+
+def test_openapi_schema_resolves_route_annotations() -> None:
+    from fastapi.testclient import TestClient
+
+    app = create_app(
+        SutConfig(token_address=TOKEN, merchant_address=MERCHANT, facilitator_key=DEPLOYER_KEY)
+    )
+    response = TestClient(app).get("/openapi.json")
+    assert response.status_code == 200
+    assert "/resource/{order_id}" in response.json()["paths"]
 
 
 def test_pay_unknown_order() -> None:
@@ -110,7 +128,10 @@ def test_backup_restore_drops_later_orders() -> None:
 def test_reconcile_reports_gap_without_healing_when_disabled() -> None:
     sut = make_sut(logs=[_transfer(10_000, "0xAA"), _transfer(25_000, "0xBB")])
     gap = sut.reconcile(from_block=0)
-    assert {c.tx_hash for c in gap} == {"0xaa", "0xbb"}
+    assert {c.tx_hash for c in gap} == {
+        "0x" + "aa".rjust(64, "0"),
+        "0x" + "bb".rjust(64, "0"),
+    }
     assert not any(o.recovered for o in sut.orders.values())  # disabled -> no heal
 
 
@@ -119,6 +140,22 @@ def test_reconcile_heals_when_enabled() -> None:
     gap = sut.reconcile(from_block=0)
     assert len(gap) == 1
     recovered = [o for o in sut.orders.values() if o.recovered]
-    assert recovered and recovered[0].paid and recovered[0].submitted_tx == "0xbb"
+    assert recovered and recovered[0].paid
+    assert recovered[0].submitted_tx == "0x" + "bb".rjust(64, "0")
     # a second pass has nothing left to reconcile
     assert sut.reconcile(from_block=0) == []
+
+
+def test_recovered_order_ids_bind_the_full_settlement_identity() -> None:
+    shared_prefix = "ab" * 4
+    tx_a = "0x" + shared_prefix + "11" * 28
+    tx_b = "0x" + shared_prefix + "22" * 28
+    sut = make_sut(
+        reconciliation_enabled=True,
+        logs=[_transfer(10_000, tx_a), _transfer(20_000, tx_b)],
+    )
+    assert len(sut.reconcile()) == 2
+    recovered = [order for order in sut.orders.values() if order.recovered]
+    assert len(recovered) == 2
+    assert len({order.order_id for order in recovered}) == 2
+    assert {order.submitted_tx for order in recovered} == {tx_a, tx_b}

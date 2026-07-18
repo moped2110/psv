@@ -19,6 +19,7 @@ talks to it solely over HTTP (or in-process), so any implementation can replace 
 
 from __future__ import annotations
 
+import hashlib
 import secrets
 import time
 from dataclasses import dataclass, field
@@ -26,10 +27,17 @@ from typing import Any
 
 from eth_account import Account
 
-from ..anvil import RpcClient
+from ..anvil import RpcClient, RpcError
 from ..chain import TokenView
 from ..quote_option import quote_is_stale
-from ..reconciliation import TOPIC_TRANSFER, OnChainCredit, find_unreconciled, topic_addr
+from ..reconciliation import (
+    TOPIC_TRANSFER,
+    OnChainCredit,
+    SettlementIdentity,
+    find_unreconciled,
+    topic_addr,
+)
+from ..safety import DEFAULT_SETTLEMENT_SAFETY_POLICY
 from .confirmer import TOPIC_TRANSFER as CONFIRMER_TOPIC
 from .confirmer import EventWatchingConfirmer
 
@@ -73,6 +81,7 @@ class _Order:
     created_block: int = 0
     recovered: bool = False  # set by reconciliation
     settle_attempts: int = 0  # how many times settlement was submitted on-chain
+    settlement_identity: SettlementIdentity | None = None
 
 
 @dataclass
@@ -83,6 +92,7 @@ class ReferenceSut:
     orders: dict[str, _Order] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        """Wire strict RPC, token, facilitator, oracle, and confirmer dependencies."""
         self.rpc = RpcClient(endpoint=self.config.rpc_endpoint)
         self.token = TokenView(self.rpc, self.config.token_address)
         self.account = Account.from_key(self.config.facilitator_key)
@@ -99,6 +109,7 @@ class ReferenceSut:
     # --- domain operations ----------------------------------------------------
 
     def quote(self) -> dict[str, Any]:
+        """Create and persist a priced x402 order with a bounded validity window."""
         order_id = "ord_" + secrets.token_hex(8)
         now = int(time.time())
         order = _Order(
@@ -120,6 +131,7 @@ class ReferenceSut:
         }
 
     def pay(self, order_id: str, authorization: dict[str, Any]) -> dict[str, Any]:
+        """Validate order state, submit its authorization, and confirm settlement."""
         order = self.orders.get(order_id)
         if order is None:
             return {"order_id": order_id, "settled": False, "reason": "unknown_order"}
@@ -150,22 +162,34 @@ class ReferenceSut:
         order.submitted_tx = tx_hash
         # Wait for the settlement to be mined before confirming. Skipping this
         # (the vulnerable mode) checks too early and reports a false "unpaid".
+        receipt: dict[str, Any] | None = None
         if not self.config.confirm_without_waiting:
-            self.rpc.wait_for_receipt(tx_hash)
+            receipt = self.rpc.wait_for_receipt(tx_hash)
         # Confirm by watching the legacy Transfer event - the SC1-vulnerable step.
-        settled = self.confirmer.is_settled(
+        settlement_log_index = self.confirmer.settlement_log_index(
             token=self.config.token_address,
             payer=str(authorization["from"]),
             payee=self.config.merchant_address,
-            min_value=order.amount,
+            expected_value=order.amount,
+            authorization_nonce=str(authorization["nonce"]),
+            submitted_tx=tx_hash,
+            receipt=receipt,
             from_block=order.created_block,
         )
-        if settled:
+        settled = settlement_log_index is not None
+        if settlement_log_index is not None:
             order.paid = True
             order.resource = f"premium-content::{order_id}"
+            order.settlement_identity = SettlementIdentity(
+                chain_id=self.config.chain_id,
+                asset=self.config.token_address,
+                tx_hash=tx_hash,
+                log_index=settlement_log_index,
+            )
         return {"order_id": order_id, "submitted_tx": tx_hash, "settled": settled}
 
     def status(self, order_id: str) -> dict[str, Any]:
+        """Return current payment and resource state without mutating the order."""
         order = self.orders.get(order_id)
         if order is None:
             return {
@@ -205,11 +229,24 @@ class ReferenceSut:
             topics=[TOPIC_TRANSFER, None, topic_addr(self.config.merchant_address)],
             from_block=from_block,
         )
-        known = {o.submitted_tx.lower() for o in self.orders.values() if o.paid and o.submitted_tx}
-        unreconciled = find_unreconciled(logs, known)
+        known: set[SettlementIdentity | OnChainCredit] = {
+            o.settlement_identity
+            for o in self.orders.values()
+            if o.paid and o.settlement_identity is not None
+        }
+        unreconciled = find_unreconciled(
+            logs,
+            known,
+            chain_id=self.config.chain_id,
+            expected_asset=self.config.token_address,
+            expected_payee=self.config.merchant_address,
+        )
         if self.config.reconciliation_enabled:
             for credit in unreconciled:
-                rid = "rec_" + credit.tx_hash[2:10]
+                identity_key = (
+                    f"{credit.chain_id}:{credit.asset}:{credit.tx_hash}:{credit.log_index}"
+                )
+                rid = "rec_" + hashlib.sha256(identity_key.encode()).hexdigest()
                 self.orders[rid] = _Order(
                     order_id=rid,
                     amount=credit.value,
@@ -219,12 +256,26 @@ class ReferenceSut:
                     submitted_tx=credit.tx_hash,
                     resource=f"recovered::{credit.tx_hash}",
                     recovered=True,
+                    settlement_identity=credit.identity,
                 )
         return unreconciled
 
     # --- on-chain facilitator submission --------------------------------------
 
     def _submit_settlement(self, authorization: dict[str, Any]) -> str:
+        """Safety-check, sign, and submit one local/testnet settlement transaction."""
+        # This is the sole signing/submission boundary.  The policy deliberately
+        # runs before calldata or transaction construction, signing, and sending.
+        DEFAULT_SETTLEMENT_SAFETY_POLICY.require_safe_submission(
+            rpc=self.rpc,
+            configured_chain_id=self.config.chain_id,
+            token_address=self.config.token_address,
+            payer_address=str(authorization["from"]),
+            payee_address=self.config.merchant_address,
+            authorization_to=str(authorization["to"]),
+            authorization_amount=authorization["value"],
+            expected_amount=self.config.price,
+        )
         calldata = self.token.settle_calldata(
             from_addr=str(authorization["from"]),
             to=str(authorization["to"]),
@@ -237,7 +288,11 @@ class ReferenceSut:
         nonce = int(self.rpc.call("eth_getTransactionCount", [self.account.address, "pending"]), 16)
         try:
             gas_price = int(self.rpc.call("eth_gasPrice"), 16)
-        except Exception:
+        except (RpcError, TypeError, ValueError):
+            # A local/test node may not implement eth_gasPrice or may answer oddly;
+            # falling back is fine because the chain is already allowlist-verified.
+            # The except list stays narrow on purpose: this is the last step before
+            # signing, and a bare `except` here would also swallow a safety error.
             gas_price = 1_000_000_000
         tx = {
             "to": self.config.token_address,
@@ -254,7 +309,7 @@ class ReferenceSut:
 
 def create_app(config: SutConfig) -> Any:
     """Build the FastAPI app exposing the SUT's HTTP adapter contract."""
-    from fastapi import FastAPI, Response
+    from fastapi import FastAPI
     from fastapi.responses import JSONResponse
 
     sut = ReferenceSut(config)
@@ -262,18 +317,22 @@ def create_app(config: SutConfig) -> Any:
 
     @app.post("/quote")
     def quote() -> dict[str, Any]:
+        """Expose quote creation through the reference HTTP contract."""
         return sut.quote()
 
     @app.post("/pay")
     def pay(body: dict[str, Any]) -> dict[str, Any]:
+        """Expose authorization submission through the reference HTTP contract."""
         return sut.pay(str(body["order_id"]), dict(body["authorization"]))
 
     @app.get("/status/{order_id}")
     def status(order_id: str) -> dict[str, Any]:
+        """Expose read-only order status through the reference HTTP contract."""
         return sut.status(order_id)
 
     @app.get("/resource/{order_id}")
-    def resource(order_id: str) -> Response:
+    def resource(order_id: str) -> Any:
+        """Return paid content or an HTTP 402 response for unpaid orders."""
         st = sut.status(order_id)
         if st.get("paid"):
             return JSONResponse({"resource": st["resource"]}, status_code=200)
@@ -283,6 +342,7 @@ def create_app(config: SutConfig) -> Any:
 
 
 def main() -> None:  # pragma: no cover - dev-machine entry point
+    """Run the reference SUT on loopback from explicit environment configuration."""
     import os
 
     import uvicorn

@@ -21,15 +21,26 @@ from __future__ import annotations
 from .anvil import RpcClient
 
 
+def _block(value: int, what: str) -> int:
+    """Validate an exact block number within the uint256 domain."""
+    if type(value) is not int or not 0 <= value <= 2**256 - 1:
+        raise ValueError(f"{what} must be a uint256")
+    return value
+
+
 def confirmations(current_block: int, tx_block: int) -> int:
     """Blocks confirming a tx, inclusive of its own block. 0 if not yet mined."""
-    if tx_block <= 0 or current_block < tx_block:
+    current = _block(current_block, "current_block")
+    transaction = _block(tx_block, "tx_block")
+    if transaction == 0 or current < transaction:
         return 0
-    return current_block - tx_block + 1
+    return current - transaction + 1
 
 
 def is_final(current_block: int, tx_block: int, required_confirmations: int) -> bool:
     """Whether a settlement is deep enough to be treated as final."""
+    if type(required_confirmations) is not int or required_confirmations <= 0:
+        raise ValueError("required_confirmations must be a positive integer")
     return confirmations(current_block, tx_block) >= required_confirmations
 
 

@@ -44,15 +44,17 @@ def test_set_automine_passes_bool() -> None:
 
 
 def test_eth_call_shape() -> None:
+    address = "0x" + "11" * 20
     send, seen = recording_transport({"eth_call": "0x2a"})
-    out = RpcClient(transport=send).eth_call("0xtok", "0xdata")
+    out = RpcClient(transport=send).eth_call(address, "0xdead")
     assert out == "0x2a"
-    assert seen[0]["params"] == [{"to": "0xtok", "data": "0xdata"}, "latest"]
+    assert seen[0]["params"] == [{"to": address, "data": "0xdead"}, "latest"]
 
 
 def test_send_raw_transaction_returns_hash() -> None:
-    send, _ = recording_transport({"eth_sendRawTransaction": "0xdeadbeef"})
-    assert RpcClient(transport=send).send_raw_transaction("0xf86b...") == "0xdeadbeef"
+    tx_hash = "0x" + "ab" * 32
+    send, _ = recording_transport({"eth_sendRawTransaction": tx_hash})
+    assert RpcClient(transport=send).send_raw_transaction("0xf86b") == tx_hash
 
 
 def test_wait_for_receipt_polls_until_present() -> None:
@@ -62,11 +64,21 @@ def test_wait_for_receipt_polls_until_present() -> None:
     def send(request: dict[str, Any]) -> dict[str, Any]:
         if request["method"] == "eth_getTransactionReceipt":
             state["calls"] += 1
-            result = None if state["calls"] < 2 else {"status": "0x1", "blockNumber": "0x5"}
+            result = (
+                None
+                if state["calls"] < 2
+                else {
+                    "transactionHash": "0x" + "ab" * 32,
+                    "blockHash": "0x" + "cd" * 32,
+                    "blockNumber": "0x5",
+                    "status": "0x1",
+                    "logs": [],
+                }
+            )
             return {"jsonrpc": "2.0", "id": request["id"], "result": result}
         return {"jsonrpc": "2.0", "id": request["id"], "result": None}
 
-    receipt = RpcClient(transport=send).wait_for_receipt("0xabc", tries=5, delay=0)
+    receipt = RpcClient(transport=send).wait_for_receipt("0x" + "ab" * 32, tries=5, delay=0)
     assert receipt["status"] == "0x1"
     assert state["calls"] == 2
 
@@ -76,4 +88,4 @@ def test_wait_for_receipt_times_out() -> None:
         return {"jsonrpc": "2.0", "id": request["id"], "result": None}
 
     with pytest.raises(RpcError):
-        RpcClient(transport=send).wait_for_receipt("0xabc", tries=3, delay=0)
+        RpcClient(transport=send).wait_for_receipt("0x" + "ab" * 32, tries=3, delay=0)

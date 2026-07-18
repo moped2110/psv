@@ -22,8 +22,10 @@ class _Rpc:
         self.calls.append(("eth_call", to, data))
         return self.result
 
-    def get_logs(self, *, address: str, topics: list[Any], from_block: Any) -> list[dict[str, Any]]:
-        self.calls.append(("get_logs", address, topics, from_block))
+    def get_logs(
+        self, *, address: str, topics: list[Any], from_block: Any, to_block: Any
+    ) -> list[dict[str, Any]]:
+        self.calls.append(("get_logs", address, topics, from_block, to_block))
         return []
 
 
@@ -36,8 +38,9 @@ def test_authorization_used_logs_builds_topics() -> None:
     rpc = _Rpc()
     token = TokenView(rpc, TOKEN)  # type: ignore[arg-type]
     token.authorization_used_logs(authorizer=ADDR, from_block=7)
-    kind, address, topics, from_block = rpc.calls[0]
+    kind, address, topics, from_block, to_block = rpc.calls[0]
     assert kind == "get_logs" and address == TOKEN and from_block == 7
+    assert to_block == "latest"
     assert topics[0] == TOPIC_AUTHORIZATION_USED
     assert topics[1] == "0x" + ADDR.lower().removeprefix("0x").rjust(64, "0")
 
@@ -45,7 +48,7 @@ def test_authorization_used_logs_builds_topics() -> None:
 def test_authorization_used_logs_without_authorizer_is_wildcard() -> None:
     rpc = _Rpc()
     TokenView(rpc, TOKEN).authorization_used_logs()  # type: ignore[arg-type]
-    _, _, topics, _ = rpc.calls[0]
+    _, _, topics, _, _ = rpc.calls[0]
     assert topics == [TOPIC_AUTHORIZATION_USED, None]
 
 
@@ -62,8 +65,8 @@ def test_parse_quote_chain_id() -> None:
         {
             "order_id": "o",
             "amount": "1",
-            "payTo": "0xm",
-            "asset": "0xt",
+            "payTo": ADDR,
+            "asset": TOKEN,
             "network": "eip155:8453",
             "extra": {"name": "USDC", "version": "2"},
         }
@@ -72,10 +75,12 @@ def test_parse_quote_chain_id() -> None:
 
 
 def test_parse_pay_and_status() -> None:
-    p = parse_pay({"order_id": "o", "submitted_tx": "0xtx", "settled": True})
-    assert p.settled is True and p.submitted_tx == "0xtx"
-    s = parse_status({"order_id": "o", "paid": True, "resource": "premium", "submitted_tx": "0xtx"})
+    tx_hash = "0x" + "ab" * 32
+    p = parse_pay({"order_id": "o", "submitted_tx": tx_hash, "settled": True})
+    assert p.settled is True and p.submitted_tx == tx_hash
+    s = parse_status(
+        {"order_id": "o", "paid": True, "resource": "premium", "submitted_tx": tx_hash}
+    )
     assert s.paid is True and s.resource == "premium"
-    # tolerant defaults when fields are missing
-    s2 = parse_status({"order_id": "o"})
+    s2 = parse_status({"order_id": "o", "paid": False, "resource": None, "submitted_tx": None})
     assert s2.paid is False and s2.resource is None

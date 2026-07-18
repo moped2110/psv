@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/moped2110/psv/schemas/run-record-v1.1.schema.json",
+  "title": "PSV run record 1.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "tool", "command", "startedAt", "finishedAt",
+    "durationSeconds", "inputs", "environment", "report", "exitCode",
+    "consistent", "error", "runId"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "1.1"},
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "psv"},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "command": {"type": "string", "minLength": 1},
+    "startedAt": {"type": "string", "format": "date-time"},
+    "finishedAt": {"type": "string", "format": "date-time"},
+    "durationSeconds": {"type": "number", "minimum": 0},
+    "inputs": {"type": "object"},
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["python", "platform", "machine"],
+      "properties": {
+        "python": {"type": "string"},
+        "platform": {"type": "string"},
+        "machine": {"type": "string"}
+      }
+    },
+    "report": {"type": ["object", "null"]},
+    "exitCode": {"type": "integer", "minimum": 0},
+    "consistent": {"type": "boolean"},
+    "error": {"type": ["string", "null"]},
+    "runId": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

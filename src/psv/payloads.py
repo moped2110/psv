@@ -35,6 +35,7 @@ _TRANSFER_WITH_AUTHORIZATION_TYPES: dict[str, list[dict[str, str]]] = {
 
 
 def _require_evm() -> None:
+    """Fail with installation guidance when optional EVM signing support is absent."""
     if not _EVM_AVAILABLE:
         raise RuntimeError(
             "EIP-3009 signing requires eth-account. Install with: pip install psv[chain]"
@@ -49,20 +50,24 @@ class EvmSigner:
 
     @classmethod
     def from_key(cls, private_key: str) -> EvmSigner:
+        """Construct a local signer from explicit private key material."""
         _require_evm()
         return cls(Account.from_key(private_key))
 
     @classmethod
     def random(cls) -> EvmSigner:
+        """Create a fresh throwaway signer for local or testnet use."""
         _require_evm()
         return cls(Account.from_key("0x" + secrets.token_hex(32)))
 
     @property
     def address(self) -> str:
+        """Return the checksummed address controlled by this signer."""
         return str(self.account.address)
 
 
 def _domain(chain_id: int, verifying_contract: str, name: str, version: str) -> dict[str, Any]:
+    """Build the EIP-712 domain for a specific token deployment."""
     return {
         "name": name,
         "version": version,
@@ -72,6 +77,7 @@ def _domain(chain_id: int, verifying_contract: str, name: str, version: str) -> 
 
 
 def _message(authorization: dict[str, Any]) -> dict[str, Any]:
+    """Normalize authorization wire values for EIP-712 encoding."""
     return {
         "from": authorization["from"],
         "to": authorization["to"],
@@ -112,6 +118,7 @@ class Authorization:
     signature: str  # 0x-prefixed 65-byte hex
 
     def as_dict(self) -> dict[str, Any]:
+        """Serialize the signed authorization to x402-compatible wire fields."""
         return {
             "from": self.from_addr,
             "to": self.to,

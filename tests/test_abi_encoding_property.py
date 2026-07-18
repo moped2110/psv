@@ -17,6 +17,7 @@ from psv.chain import TokenView, _slot_addr, _slot_bytes32, _slot_uint
 _UINT256_MAX = 2**256 - 1
 
 _uint256 = st.integers(min_value=0, max_value=_UINT256_MAX)
+_positive_uint256 = st.integers(min_value=1, max_value=_UINT256_MAX)
 _addr = st.integers(min_value=0, max_value=2**160 - 1).map(lambda n: "0x" + f"{n:040x}")
 
 
@@ -50,7 +51,7 @@ def test_slot_addr_rejects_oversized() -> None:
         _slot_bytes32("0x" + "cd" * 33)  # 33 bytes > bytes32
 
 
-@given(value=_uint256)
+@given(value=_positive_uint256)
 def test_settle_calldata_encodes_value_word_faithfully(value: int) -> None:
     # The `value` argument must land in its slot decodable back to the original,
     # even at uint256 max — the amount is the money-carrying field.

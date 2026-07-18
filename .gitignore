@@ -8,6 +8,8 @@ dist/
 build/
 .mypy_cache/
 .pytest_cache/
+.ruff_cache/
+.hypothesis/
 
 # Secrets / local config — never commit
 .env
@@ -15,10 +17,12 @@ build/
 
 # Agent configuration (internal working instructions — mirrors 01-x402-testsuite)
 CLAUDE.md
+AGENTS.md
 # Personal quick-start with local machine paths — public guide is docs/SETUP-onchain.md
 START-HERE.md
 # Private working backlog — do not commit (run once: git rm --cached TODO.md)
 TODO.md
+TODO-*.md
 # Internal strategy / raw test-idea analysis — sanitize before any public push
 docs/source-testcases.md
 docs/system-test-catalog.md
@@ -35,3 +39,5 @@ anvil-state.json
 
 # Default run-record directory (audit trail of runs) — machine-local, not tracked.
 psv-runs/
+.smoke/
+wheelhouse/

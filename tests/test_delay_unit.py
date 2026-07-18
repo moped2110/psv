@@ -49,8 +49,8 @@ def _sut(*, confirm_without_waiting: bool) -> tuple[ReferenceSut, _Rpc]:
     )
     rpc = _Rpc()
     sut.rpc = rpc  # type: ignore[assignment]
-    sut._submit_settlement = lambda auth: "0xtx"  # type: ignore[assignment]
-    sut.confirmer.is_settled = lambda **kw: True  # type: ignore[assignment]
+    sut._submit_settlement = lambda auth: "0x" + "ab" * 32  # type: ignore[assignment]
+    sut.confirmer.settlement_log_index = lambda **kw: 1  # type: ignore[assignment]
     return sut, rpc
 
 
@@ -58,7 +58,7 @@ def test_default_waits_for_receipt() -> None:
     sut, rpc = _sut(confirm_without_waiting=False)
     oid = sut.quote()["order_id"]
     sut.pay(oid, AUTH)
-    assert rpc.waited == ["0xtx"]  # waited for inclusion before confirming
+    assert rpc.waited == ["0x" + "ab" * 32]  # waited for inclusion before confirming
 
 
 def test_vulnerable_mode_skips_the_wait() -> None:

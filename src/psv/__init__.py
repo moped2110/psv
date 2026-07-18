@@ -5,7 +5,7 @@ outside (one URL, black-box), this harness verifies that the *system behind* the
 endpoint pays, books and recovers correctly under real chain conditions:
 settlement detection, RPC resilience, idempotency, reorg handling, reconciliation.
 
-Two ingredients are always required (see CLAUDE.md):
+Two ingredients are always required:
   1. a System-under-Test (SUT) reachable over a defined HTTP adapter, and
   2. a controllable chain (Anvil) we can snapshot, revert and manipulate.
 

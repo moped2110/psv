@@ -1,107 +1,132 @@
 # psv — payment-system verification harness
 
-A system-level test harness for **complete x402 payment systems**. Where a
-black-box conformance tester checks whether an endpoint *speaks the protocol*,
-`psv` verifies whether the system *behind* that endpoint **pays, books and
-recovers correctly** under real chain conditions: settlement detection, RPC
-resilience, idempotency, reorg handling, reconciliation.
+`psv` is a system-level test harness for complete x402 payment systems. A
+black-box conformance suite checks whether an endpoint speaks the protocol; psv
+checks whether the system behind it settles, books and recovers correctly under
+chain, RPC, reorg and load failures.
 
-## The core idea: an independent chain-truth oracle
+## Independent chain truth
 
-A payment system holds a *belief* about each payment ("order is paid / unpaid").
-`psv` holds a second, independent record read **directly from the chain** —
-balances moved, EIP-3009 nonce burned, settlement event emitted. When the two
-disagree, that gap is the bug:
+A payment system holds a belief about an order: paid or unpaid. psv independently
+proves one settlement from the chain. A verdict is bound to one chain, canonical
+block, transaction receipt, exact Transfer log, EIP-3009 nonce log/state, token,
+payer, payee and amount. Parent/settlement balances are read at pinned block
+numbers, and the block identity is rechecked before a verdict is emitted.
 
-| chain truth | system belief | verdict |
+| Proven chain result | SUT belief | Verdict |
 |---|---|---|
-| funds moved | paid | ✅ consistent |
-| no funds | unpaid | ✅ consistent |
-| **funds moved** | **unpaid** | 🔴 **silent loss** — customer paid, gets nothing |
-| **no funds** | **paid** | 🔴 **phantom credit** — resource handed out free |
+| exact amount received | paid | consistent paid |
+| no settlement | unpaid | consistent unpaid |
+| funds received | unpaid | **silent loss** — customer paid and gets nothing |
+| no settlement | paid | **phantom credit** — resource released for free |
+| too little received | paid | **underpaid credit** — partial/net payment accepted as full |
 
-The two red cases are invisible to black-box conformance. Catching them is the
-entire point of a system-level harness.
+The three divergence cases are system failures that protocol conformance alone
+cannot detect.
 
-## What's in the box
+## Components
 
-- A **controllable chain** wrapper over [Anvil](https://book.getfoundry.sh/anvil/)
-  (`psv.anvil`): snapshot/revert per test, mine, advance time, `eth_getLogs`.
-- A **chain-truth oracle** (`psv.chain`): reads balances, nonce state and the
-  drift-proof `AuthorizationUsed` event straight from the token.
-- A **SUT adapter contract** (`psv.sut`): a tiny HTTP interface (`quote` / `pay`
-  / `status`) so the same tests run against any payment system.
-- A **bundled reference SUT** (`psv.reference_sut`): a faithful miniature payment
-  system — quote, on-chain settle, **event-watching confirmation**, resource
-  unlock — used to exercise the harness end to end.
-- A **divergence detector** (`psv.divergence`): grades chain-truth vs. belief.
+- `psv.anvil`: strict JSON-RPC client plus deterministic Anvil process control.
+- `psv.chain`: pinned token reads, exact ABI encoders and settlement evidence.
+- `psv.sut`: strict quote/pay/status adapter with bounded HTTP input and lifecycle.
+- `psv.reference_sut`: a miniature system used to calibrate the harness end to end.
+- `psv.safety`: fail-closed pre-signing checks for chain, token code, payer, payee
+  and exact quoted amount. Only explicit local/test chains are allowed.
+- `psv.rails`: versioned rail metadata, proxy/code identity and finality rules.
+  Live reconciliation is read-only; uncalibrated or drifted rails fail closed.
+- `psv.reconciliation` and `psv.divergence`: exact settlement identity, ledger
+  reconciliation and graded verdicts.
+- `psv.report` and `psv.run_record`: versioned schemas, stable reason codes,
+  evidence provenance, privacy policy and collision-safe integrity records.
+- `psv.load`: ramp/spike/soak/breakpoint/recovery stages, facilitator pooling,
+  attempted/successful throughput and bounded error evidence.
 
-## Demonstrated findings (top-damage scenarios)
+The demonstrated damage scenarios include event/ABI drift (SC1), ledger restore
+divergence (D3), quote-as-option (G3), reorg invalidation, idempotency, delayed or
+stuck settlement, facilitator crash, fee-on-transfer underpayment, cross-chain
+replay, fake/EOA assets and differential SUT behavior. See [`docs/`](docs/) for
+the scenario explanations.
 
-Each is reproduced end-to-end against the bundled reference SUT and caught by the
-harness — none are visible to black-box conformance:
-
-- **SC1 — contract / event drift.** A token changes its settlement event
-  signature *in place* (a proxy upgrade); payments keep moving funds, but the
-  system's event filter goes blind and reports every order unpaid → **silent
-  loss**. [`docs/sc1-abi-drift.md`](docs/sc1-abi-drift.md)
-- **D3 — backup/restore vs. chain divergence.** A ledger rollback forgets a
-  payment that settled on-chain; reconciliation (chain credits minus ledger
-  records) surfaces and heals exactly the gap. [`docs/d3-reconciliation.md`](docs/d3-reconciliation.md)
-- **G3 — quote as a free option.** A locked quote honored after the fair value
-  moves is a free call option; a re-pricing guard rejects stale quotes before
-  settlement. [`docs/g3-quote-option.md`](docs/g3-quote-option.md)
-- **R — reorg invalidation (Phase 2).** A settled, booked payment is undone by a
-  chain reorg (funds + nonce return) while the system still believes it paid →
-  **phantom credit**; the defense is finality-by-confirmations.
-  [`docs/r-reorg-finality.md`](docs/r-reorg-finality.md)
-- **T — token quirks (Phase 3).** Wrong-decimals assumptions mis-charge; a
-  fee-on-transfer token emits a gross event while crediting net, so confirming on
-  the event (not the received delta) is silently underpaid.
-  [`docs/t-token-quirks.md`](docs/t-token-quirks.md)
-- **C0 / N10 / N15 / N16 — security (Phase 4).** Cross-chain signature replay (domain
-  binds `chainId`), fake-token/whitelist bypass (scope verification to the expected
-  asset), order-id predictability (unguessable session ids), and asset-is-an-EOA
-  (a `transferWithAuthorization` to a code-less address is a silent no-op — settle
-  "succeeds" without moving funds; `eth_getCode` separates an EOA from a token).
-  [`docs/c-security-gametheory.md`](docs/c-security-gametheory.md)
-- **Load profiles (Phase 5).** `psv.load.run_profile` drives a target
-  concurrently and reports throughput + latency percentiles while asserting
-  correctness under load (every payment settles exactly once). Behind the `load`
-  marker (`pytest -m load`), out of the default run.
-- **Multi-asset rails (read-only).** `psv.rails` carries a small registry of real
-  rails (USDC on Base, JPYC on Polygon, EURC on Base — the MiCA EUR rail) and a
-  `reconcile_live` path that reads `balanceOf` + `authorizationState` and grades
-  divergence against the chain. Strictly read-only: it never signs or settles, so
-  it can run against a live chain without moving funds. [`docs/rails.md`](docs/rails.md)
+The machine-readable source of support truth is
+[`support-matrix.json`](support-matrix.json). The exact guarantees and limitations
+of a green run are in [`docs/support-matrix.md`](docs/support-matrix.md).
 
 ## Install
 
+Python 3.11 or newer is required.
+
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"     # chain + sut + test tooling
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
 ```
 
-## Run
+Available extras are `chain`, `sut`, `dev` and `release`. The `sut` extra includes
+its signing/recovery runtime dependency; the core CLI remains dependency-light.
 
-Offline logic tests run anywhere (no chain):
+## Test
 
 ```bash
-pytest                      # on-chain + load tests are deselected by default
+# Offline default gate
+pytest -q
+mypy
+ruff check src tests tools
+ruff format --check src tests tools
+python tools/check_function_docs.py
+python tools/check_public_repo.py
+python tools/validate_support_matrix.py
+
+# Opt-in local-chain and load gates
+pytest -q -m onchain
+pytest -q -m load
 ```
 
-The on-chain end-to-end and SC1 tests need Anvil + a deployed token — see
-[`docs/SETUP-onchain.md`](docs/SETUP-onchain.md):
+On-chain tests require Anvil and the deterministic mock-token deployment described
+in [`docs/SETUP-onchain.md`](docs/SETUP-onchain.md). Solidity has its own gates:
 
 ```bash
-pytest -m onchain
+forge fmt --check --root onchain
+forge build --root onchain
+forge test --root onchain
+```
+
+## Read-only reconciliation CLI
+
+The CLI requires an exact settlement identity and invoice amount. It never falls
+back to unattributed aggregate balance deltas.
+
+```bash
+psv reconcile \
+  --rail mock-anvil \
+  --payer 0x1111111111111111111111111111111111111111 \
+  --payee 0x2222222222222222222222222222222222222222 \
+  --nonce 0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  --tx-hash 0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \
+  --log-index 0 \
+  --required-amount 10000 \
+  --payer-before 1000000 \
+  --payee-before 0 \
+  --sut-paid
+```
+
+Exit codes are stable: `0` consistent, `1` critical divergence, `2` invalid
+input/RPC/evidence/output failure. JSON/Markdown outputs and the default run
+record contain the evidence needed to reproduce the decision. A run-record hash
+is an integrity checksum, not a signer-authenticity proof.
+
+Rail drift can be checked without moving value:
+
+```bash
+psv rail-drift --rail usdc-base --rpc-url https://mainnet.base.org
 ```
 
 ## Safety
 
-No mainnet money, ever. The harness runs against a local Anvil chain using
-Anvil's well-known **public** development keys, which control only local test
-funds. No custody, no payment service, no advice — this is a test tool.
+No mainnet money, ever. Reconciliation and drift checks are read-only. The only
+bundled signing path rejects EVM mainnets and unknown chains before transaction
+construction/signing and permits only local Anvil or explicitly reviewed testnet
+chains. Tests use Anvil's public development keys and local test funds. psv is a
+verification tool, not custody, a payment service, or legal/financial advice.
 
 ## License
 

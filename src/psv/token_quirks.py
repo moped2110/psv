@@ -1,59 +1,92 @@
-"""Token quirks — decimals & fee-on-transfer (Phase 3, T-class).
-
-System-level payment bugs that come from assuming "USDC semantics":
-
-  * **decimals** — computing an amount with the wrong number of decimals over- or
-    under-charges by orders of magnitude (a 6-decimals assumption against an
-    18-decimals token is off by 10^12).
-  * **fee-on-transfer** — the merchant *receives* less than the authorized amount
-    because the token skims a fee on transfer. A system that confirms settlement
-    on the authorization/event amount (rather than the merchant's actual balance
-    delta) is silently underpaid.
-
-Pure arithmetic, fully offline-testable. The chain-truth oracle supplies the real
-received delta on-chain; these helpers decide whether it is sufficient.
-"""
+"""Exact arithmetic for token decimals and fee-on-transfer behavior."""
 
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+
+_UINT256_MAX = 2**256 - 1
+_MAX_DECIMALS = 255  # ERC-20 ``decimals()`` is conventionally a uint8.
+
+
+def _decimals(value: int) -> int:
+    """Validate a conventional ERC-20 uint8 decimal count."""
+    if type(value) is not int or not 0 <= value <= _MAX_DECIMALS:
+        raise ValueError(f"decimals must be an integer within [0, {_MAX_DECIMALS}]")
+    return value
+
+
+def _uint256(value: int, what: str) -> int:
+    """Validate an exact non-negative integer in the uint256 domain."""
+    if type(value) is not int or not 0 <= value <= _UINT256_MAX:
+        raise ValueError(f"{what} must be a uint256")
+    return value
 
 
 def to_atomic(human: str | int, decimals: int) -> int:
-    """Human amount -> atomic units for a token with ``decimals`` places.
-
-    Raises if the amount isn't representable at that precision (e.g. fractional
-    atomic units), so a wrong-decimals assumption fails loudly instead of silently
-    truncating.
-    """
-    if decimals < 0:
-        raise ValueError("decimals must be >= 0")
-    scaled = Decimal(str(human)) * (Decimal(10) ** decimals)
-    if scaled != scaled.to_integral_value():
-        raise ValueError(f"{human!r} is not representable in {decimals} decimals")
-    return int(scaled)
+    """Convert a finite, non-negative human amount to atomic units exactly."""
+    places = _decimals(decimals)
+    if isinstance(human, bool) or not isinstance(human, (str, int)):
+        raise ValueError("human amount must be a decimal string or integer")
+    if isinstance(human, str) and len(human) > 1024:
+        raise ValueError("human amount exceeds the input size limit")
+    try:
+        amount = Decimal(str(human))
+    except InvalidOperation as exc:
+        raise ValueError(f"invalid human amount: {human!r}") from exc
+    if not amount.is_finite() or amount < 0:
+        raise ValueError("human amount must be finite and non-negative")
+    decimal_tuple = amount.as_tuple()
+    exponent = decimal_tuple.exponent
+    if not isinstance(exponent, int):  # guarded by is_finite(), for type checkers
+        raise ValueError("human amount must be finite")
+    coefficient = int("".join(str(digit) for digit in decimal_tuple.digits) or "0")
+    scaled_exponent = exponent + places
+    if scaled_exponent >= 0:
+        if coefficient and len(str(coefficient)) + scaled_exponent > 78:
+            raise ValueError("atomic amount must be a uint256")
+        atomic = coefficient * (10**scaled_exponent)
+    else:
+        divisor_places = -scaled_exponent
+        if coefficient and divisor_places > len(str(coefficient)):
+            raise ValueError(f"{human!r} is not representable in {places} decimals")
+        divisor = 10**divisor_places
+        atomic, remainder = divmod(coefficient, divisor)
+        if remainder:
+            raise ValueError(f"{human!r} is not representable in {places} decimals")
+    if decimal_tuple.sign:
+        atomic = -atomic
+    if atomic < 0:
+        raise ValueError("human amount must be non-negative")
+    return _uint256(atomic, "atomic amount")
 
 
 def from_atomic(atomic: int, decimals: int) -> str:
-    """Atomic units -> human decimal string."""
-    if decimals < 0:
-        raise ValueError("decimals must be >= 0")
-    return format(Decimal(atomic) / (Decimal(10) ** decimals), "f")
+    """Convert a uint256 atomic amount to a human decimal string exactly."""
+    value = _uint256(atomic, "atomic amount")
+    places = _decimals(decimals)
+    if places == 0:
+        return str(value)
+    digits = str(value).rjust(places + 1, "0")
+    whole, fraction = digits[:-places], digits[-places:]
+    fraction = fraction.rstrip("0")
+    return whole if not fraction else f"{whole}.{fraction}"
 
 
 def net_after_fee(gross: int, fee_bps: int) -> int:
-    """Amount the recipient nets after a basis-point transfer fee (rounded down)."""
-    if not 0 <= fee_bps <= 10_000:
-        raise ValueError("fee_bps must be within [0, 10000]")
-    return gross - (gross * fee_bps) // 10_000
+    """Amount the recipient nets after a basis-point fee (rounded down)."""
+    amount = _uint256(gross, "gross")
+    if type(fee_bps) is not int or not 0 <= fee_bps <= 10_000:
+        raise ValueError("fee_bps must be an integer within [0, 10000]")
+    return amount - (amount * fee_bps) // 10_000
 
 
 def received_is_sufficient(received: int, required: int) -> bool:
-    """The merchant must NET at least the required amount. Verify on the balance
-    delta, never on the authorization or the (possibly gross) Transfer event."""
-    return received >= required
+    """Return whether the merchant's exact net receipt covers the requirement."""
+    return _uint256(received, "received") >= _uint256(required, "required")
 
 
 def underpayment(received: int, required: int) -> int:
-    """How much the merchant is short (0 if fully paid)."""
-    return max(0, required - received)
+    """How much the merchant is short (zero if fully paid)."""
+    actual = _uint256(received, "received")
+    expected = _uint256(required, "required")
+    return max(0, expected - actual)
