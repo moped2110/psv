@@ -19,6 +19,34 @@ env:
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 jobs:
+  lock:
+    name: Reproducible dependency lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/ci.txt
+      - name: Install hash-locked CI environment
+        run: python -m pip install --require-hashes -r requirements/ci.txt
+      - name: Verify the lock matches its inputs
+        run: |
+          # Regenerate and diff. Without this guard a lock can silently drift from
+          # requirements/ci.in — which is how the missing `editables` entry and the
+          # 3.12-only resolution reached main and broke every job on 2026-07-18.
+          #
+          # --python-version pins the resolution floor to the lowest version in the
+          # test matrix below. Dropping it omits dependencies that only apply under
+          # 3.12 (jaraco-context -> backports-tarfile) and --require-hashes then
+          # fails on 3.11. The flags must match requirements/ci.in's header comment
+          # exactly, because uv records the invocation in the generated file.
+          uv pip compile --universal --python-version 3.11 --generate-hashes \
+            --no-annotate -o requirements/ci.txt requirements/ci.in
+          git diff --exit-code -- requirements/ci.txt
+
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 15

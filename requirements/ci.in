@@ -25,3 +25,6 @@ hatchling>=1.27
 editables>=0.5
 twine>=5.1
 pip-audit>=2.7
+# Needed by the lock-drift guard in ci.yml, which regenerates this lock and diffs
+# it. Locking the resolver itself keeps that check reproducible.
+uv>=0.5
