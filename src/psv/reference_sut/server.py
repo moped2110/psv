@@ -27,7 +27,7 @@ from typing import Any
 
 from eth_account import Account
 
-from ..anvil import RpcClient
+from ..anvil import RpcClient, RpcError
 from ..chain import TokenView
 from ..quote_option import quote_is_stale
 from ..reconciliation import (
@@ -288,7 +288,11 @@ class ReferenceSut:
         nonce = int(self.rpc.call("eth_getTransactionCount", [self.account.address, "pending"]), 16)
         try:
             gas_price = int(self.rpc.call("eth_gasPrice"), 16)
-        except Exception:
+        except (RpcError, TypeError, ValueError):
+            # A local/test node may not implement eth_gasPrice or may answer oddly;
+            # falling back is fine because the chain is already allowlist-verified.
+            # The except list stays narrow on purpose: this is the last step before
+            # signing, and a bare `except` here would also swallow a safety error.
             gas_price = 1_000_000_000
         tx = {
             "to": self.config.token_address,
