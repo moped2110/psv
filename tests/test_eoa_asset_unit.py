@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from psv.anvil import RpcClient
 from psv.chain import SettlementTruth
 from psv.security_checks import asset_is_deployed_contract
@@ -18,13 +20,15 @@ from psv.security_checks import asset_is_deployed_contract
 
 def test_eoa_code_is_rejected() -> None:
     assert asset_is_deployed_contract("0x") is False  # EOA: empty code
-    assert asset_is_deployed_contract("") is False
     assert asset_is_deployed_contract("0x" + "00" * 16) is False  # all-zero edge
+    with pytest.raises(ValueError):
+        asset_is_deployed_contract("")
 
 
 def test_contract_code_is_accepted() -> None:
     assert asset_is_deployed_contract("0x60806040523480") is True
-    assert asset_is_deployed_contract("60806040") is True  # without 0x prefix
+    with pytest.raises(ValueError):
+        asset_is_deployed_contract("60806040")
 
 
 def test_eoa_settlement_is_a_phantom_credit() -> None:
@@ -47,10 +51,11 @@ def test_get_code_helper_feeds_the_guard() -> None:
         return {"jsonrpc": "2.0", "id": req["id"], "result": "0x60806040"}
 
     rpc = RpcClient(transport=fake)
-    assert rpc.get_code("0xcontract") == "0x60806040"
-    assert asset_is_deployed_contract(rpc.get_code("0xcontract")) is True
+    address = "0x" + "11" * 20
+    assert rpc.get_code(address) == "0x60806040"
+    assert asset_is_deployed_contract(rpc.get_code(address)) is True
 
     def empty(req: dict[str, Any]) -> dict[str, Any]:
         return {"jsonrpc": "2.0", "id": req["id"], "result": "0x"}
 
-    assert asset_is_deployed_contract(RpcClient(transport=empty).get_code("0xeoa")) is False
+    assert asset_is_deployed_contract(RpcClient(transport=empty).get_code(address)) is False

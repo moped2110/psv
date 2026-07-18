@@ -80,6 +80,13 @@ def authorization_binds_to_chain(
 
 def asset_matches(log_address: str, expected_token: str) -> bool:
     """True iff a settlement log came from the expected token contract."""
+    if (
+        not isinstance(log_address, str)
+        or not isinstance(expected_token, str)
+        or re.fullmatch(r"0[xX][0-9a-fA-F]{40}", log_address) is None
+        or re.fullmatch(r"0[xX][0-9a-fA-F]{40}", expected_token) is None
+    ):
+        raise ValueError("asset addresses must be exact 20-byte EVM addresses")
     return log_address.lower() == expected_token.lower()
 
 
@@ -109,5 +116,7 @@ def asset_is_deployed_contract(code: str) -> bool:
     empty bytecode -> reject the asset before signature verification or settlement.
     Mirrors the x402 SDK's ``asset_not_deployed_contract`` check (x402#2554).
     """
-    stripped = code.lower().removeprefix("0x")
+    if not isinstance(code, str) or re.fullmatch(r"0x(?:[0-9a-fA-F]{2})*", code) is None:
+        raise ValueError("code must be 0x-prefixed even-length hex data")
+    stripped = code[2:].lower()
     return len(stripped) > 0 and any(c != "0" for c in stripped)

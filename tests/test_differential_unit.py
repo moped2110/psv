@@ -11,13 +11,21 @@ from __future__ import annotations
 from psv.chain import SettlementTruth
 from psv.differential import run_differential
 from psv.divergence import DivergenceKind
-from psv.reference_sut.confirmer import TOPIC_TRANSFER, EventWatchingConfirmer, topic_addr
+from psv.reference_sut.confirmer import (
+    TOPIC_AUTHORIZATION_USED,
+    TOPIC_TRANSFER,
+    EventWatchingConfirmer,
+    topic_addr,
+    topic_nonce,
+)
 
 PAYER = "0x" + "11" * 20
 PAYEE = "0x" + "22" * 20
 TOKEN = "0x" + "a0" * 20
 DRIFTED_TOPIC0 = "0x" + "58" * 32  # a proxy-upgraded event signature the SUT never learned
 AMOUNT = 10_000
+TX = "0x" + "aa" * 32
+NONCE = "0x" + "bb" * 32
 
 
 def _log_source(emitted_topic0: str, value: int):
@@ -28,8 +36,12 @@ def _log_source(emitted_topic0: str, value: int):
         if topics and topics[0] == emitted_topic0:
             return [
                 {
+                    "address": TOKEN,
                     "data": hex(value),
                     "topics": [emitted_topic0, topic_addr(PAYER), topic_addr(PAYEE)],
+                    "transactionHash": TX,
+                    "blockNumber": "0x1",
+                    "logIndex": "0x1",
                 }
             ]
         return []
@@ -41,7 +53,39 @@ def _believes_paid(watched_topic0: str, emitted_topic0: str) -> bool:
     confirmer = EventWatchingConfirmer(
         fetch_logs=_log_source(emitted_topic0, AMOUNT), watched_topic0=watched_topic0
     )
-    return confirmer.is_settled(token=TOKEN, payer=PAYER, payee=PAYEE, min_value=AMOUNT)
+    receipt = {
+        "status": "0x1",
+        "transactionHash": TX,
+        "to": TOKEN,
+        "blockNumber": "0x1",
+        "logs": [
+            {
+                "address": TOKEN,
+                "data": "0x",
+                "topics": [TOPIC_AUTHORIZATION_USED, topic_addr(PAYER), topic_nonce(NONCE)],
+                "transactionHash": TX,
+                "blockNumber": "0x1",
+                "logIndex": "0x0",
+            },
+            {
+                "address": TOKEN,
+                "data": hex(AMOUNT),
+                "topics": [emitted_topic0, topic_addr(PAYER), topic_addr(PAYEE)],
+                "transactionHash": TX,
+                "blockNumber": "0x1",
+                "logIndex": "0x1",
+            },
+        ],
+    }
+    return confirmer.is_settled(
+        token=TOKEN,
+        payer=PAYER,
+        payee=PAYEE,
+        expected_value=AMOUNT,
+        authorization_nonce=NONCE,
+        submitted_tx=TX,
+        receipt=receipt,
+    )
 
 
 def _paid_truth() -> SettlementTruth:

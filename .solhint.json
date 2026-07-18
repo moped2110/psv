@@ -1,0 +1,16 @@
+{
+  "extends": "solhint:recommended",
+  "rules": {
+    "compiler-version": ["error", "^0.8.20"],
+    "func-name-mixedcase": "off",
+    "func-visibility": "off",
+    "gas-custom-errors": "off",
+    "gas-indexed-events": "off",
+    "gas-small-strings": "off",
+    "gas-strict-inequalities": "off",
+    "const-name-snakecase": "off",
+    "no-inline-assembly": "off",
+    "reason-string": "off",
+    "use-natspec": "off"
+  }
+}

@@ -7,7 +7,13 @@ from typing import Any
 import pytest
 
 from psv.divergence import DivergenceKind, detect_payment_divergence, settlement_truth_from_balances
-from psv.reference_sut.confirmer import EventWatchingConfirmer
+from psv.reference_sut.confirmer import (
+    TOPIC_AUTHORIZATION_USED,
+    TOPIC_TRANSFER,
+    EventWatchingConfirmer,
+    topic_addr,
+    topic_nonce,
+)
 from psv.reorg import confirmations, is_final, reorg_to, take_checkpoint
 
 
@@ -67,5 +73,42 @@ def test_confirmer_does_not_swallow_rpc_error_into_false_negative() -> None:
         raise ConnectionError("RPC node unreachable")
 
     c = EventWatchingConfirmer(fetch_logs=broken_fetch)
+    token = "0x" + "aa" * 20
+    payer = "0x" + "bb" * 20
+    payee = "0x" + "cc" * 20
+    tx_hash = "0x" + "dd" * 32
+    nonce = "0x" + "ee" * 32
+    receipt = {
+        "status": "0x1",
+        "transactionHash": tx_hash,
+        "to": token,
+        "blockNumber": "0x1",
+        "logs": [
+            {
+                "address": token,
+                "topics": [TOPIC_AUTHORIZATION_USED, topic_addr(payer), topic_nonce(nonce)],
+                "data": "0x",
+                "transactionHash": tx_hash,
+                "blockNumber": "0x1",
+                "logIndex": "0x0",
+            },
+            {
+                "address": token,
+                "topics": [TOPIC_TRANSFER, topic_addr(payer), topic_addr(payee)],
+                "data": "0x1",
+                "transactionHash": tx_hash,
+                "blockNumber": "0x1",
+                "logIndex": "0x1",
+            },
+        ],
+    }
     with pytest.raises(ConnectionError):
-        c.is_settled(token="0xt", payer="0xp", payee="0xm", min_value=1)
+        c.is_settled(
+            token=token,
+            payer=payer,
+            payee=payee,
+            expected_value=1,
+            authorization_nonce=nonce,
+            submitted_tx=tx_hash,
+            receipt=receipt,
+        )

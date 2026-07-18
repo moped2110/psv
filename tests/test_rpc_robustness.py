@@ -28,7 +28,7 @@ class _FakeResp:
     def __exit__(self, *_a: object) -> bool:
         return False
 
-    def read(self) -> bytes:
+    def read(self, _size: int = -1) -> bytes:
         return self._body
 
 
@@ -56,7 +56,7 @@ def test_chain_malformed_hex_result_is_rpc_error() -> None:
         return {"jsonrpc": "2.0", "id": request["id"], "result": "0xNOTHEX"}
 
     token = TokenView(rpc=RpcClient(transport=transport), address="0x" + "33" * 20)
-    with pytest.raises(RpcError, match="malformed result"):
+    with pytest.raises(RpcError, match="eth_call result"):
         token.balance_of("0x" + "11" * 20)
 
 

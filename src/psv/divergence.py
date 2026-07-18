@@ -50,6 +50,7 @@ class Divergence:
 
     @property
     def is_failure(self) -> bool:
+        """Return whether this verdict represents a critical system mismatch."""
         return self.severity is Severity.CRITICAL
 
 

@@ -49,8 +49,8 @@ def make_settling_sut(*, idempotent_pay: bool) -> tuple[ReferenceSut, list[Any]]
     )
     submits: list[Any] = []
     sut.rpc = _Rpc()  # type: ignore[assignment]
-    sut._submit_settlement = lambda auth: submits.append(auth) or f"0xtx{len(submits)}"  # type: ignore[assignment,func-returns-value]
-    sut.confirmer.is_settled = lambda **kw: True  # type: ignore[assignment]
+    sut._submit_settlement = lambda auth: submits.append(auth) or "0x" + f"{len(submits):064x}"  # type: ignore[assignment,func-returns-value]
+    sut.confirmer.settlement_log_index = lambda **kw: 1  # type: ignore[assignment]
     return sut, submits
 
 

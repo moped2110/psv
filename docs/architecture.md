@@ -1,95 +1,97 @@
 # Architecture
 
-`psv` verifies a **complete payment system** (the System-under-Test, "SUT"), not
-a single endpoint. It needs two things that black-box testing does not: a SUT it
-can drive over a stable interface, and a chain it can *manipulate and read as
-ground truth*.
+psv verifies a complete payment system, not one HTTP response. The SUT adapter
+captures what the system believes; the chain oracle independently proves what
+happened. The divergence detector compares those two records.
 
+```mermaid
+flowchart LR
+    P["Payer authorization"] --> S["System under test"]
+    A["SUT adapter: quote / pay / status"] <--> S
+    S -->|"local/testnet settlement only"| C["EVM chain"]
+    C --> R["Strict RPC + rail attestation"]
+    R --> E["Pinned receipt, logs, state and balances"]
+    A --> D["Divergence detector"]
+    E --> D
+    D --> O["Versioned report + run record"]
 ```
-        signs EIP-3009                 settles on-chain
- payer ───────────────►  SUT  ─────────────────────────►  Anvil (token)
-                          │  ▲                                  ▲
-                  quote / │  │ status                          │ balances, nonce,
-                   pay    │  │ (belief)                        │ AuthorizationUsed
-                          ▼  │                                  │ (ground truth)
-                    ┌─────────────┐   chain truth   ┌───────────────────────┐
-                    │  SUT adapter│◄───────────────►│  chain-truth oracle    │
-                    └──────┬──────┘                 └───────────┬───────────┘
-                           │     belief  vs  truth              │
-                           ▼                                    ▼
-                        ┌──────────────────────────────────────────┐
-                        │            divergence detector            │
-                        └──────────────────────────────────────────┘
-```
+
+## Trust boundaries
+
+SUT responses and RPC responses are untrusted. Wire booleans, hashes, addresses,
+CAIP-2 networks, numeric domains, JSON-RPC envelopes and result shapes are parsed
+strictly and fail closed. No verdict is produced from a malformed or ambiguous
+response.
+
+The bundled reference SUT has one value-bearing boundary. Before calldata,
+transaction construction, signing or broadcast, `psv.safety` verifies:
+
+- the configured chain is in the immutable local/testnet allowlist;
+- live `eth_chainId` equals the configured chain;
+- token, payer and payee are exact nonzero addresses;
+- deployed token code exists; and
+- the authorization amount equals the positive quoted amount.
+
+Mainnets and unknown chains have no runtime override.
+
+## Atomic chain evidence
+
+`reconcile_live` accepts an exact transaction hash, Transfer log index and required
+amount. It then binds all evidence to one rail and observation window:
+
+1. Verify the RPC chain and rail attestation.
+2. Select the rail's `safe`, `finalized` or explicit finality block.
+3. Fetch one receipt and require its transaction hash, status and canonical block.
+4. Decode one exact token/from/to/value Transfer log plus one matching
+   `AuthorizationUsed(authorizer, nonce)` log.
+5. Read code, nonce state and payer/payee balances at pinned parent/settlement
+   blocks.
+6. Reject same-block transfer races, removed/duplicate/malformed logs and
+   unattributable balance changes.
+7. Re-fetch receipt/block identity to detect a reorg during observation.
+8. Grade SUT belief only from that evidence bundle.
+
+Aggregate `latest` balance deltas cannot establish a positive settlement verdict.
 
 ## Modules
 
-| Module | Role |
+| Module | Responsibility |
 |---|---|
-| `psv.anvil` | `RpcClient` (JSON-RPC 2.0, injectable transport) + `AnvilProcess` (subprocess manager). Chain manipulation: `snapshot`/`revert`, `mine`, `increase_time`, `get_logs`. |
-| `psv.chain` | `TokenView` — reads balances, `authorizationState`, `AuthorizationUsed` logs; builds `transferWithAuthorization` / admin calldata. `SettlementTruth` — the on-chain ground truth of one payment. |
-| `psv.payloads` | EIP-3009 `TransferWithAuthorization` signing (independent of any x402 SDK). |
-| `psv.sut` | `SutAdapter` ABC + `HttpSutAdapter`. The contract every SUT must satisfy: `quote` / `pay` / `status`. |
-| `psv.reference_sut` | A bundled, faithful SUT used to exercise the harness. Settlement is confirmed by **watching the `Transfer` event** — deliberately the SC1-vulnerable pattern. |
-| `psv.divergence` | Compares ground truth to SUT belief → `Divergence` (`silent_loss` / `phantom_credit` / `underpaid_credit` / consistent, + severity). |
-| `psv.reorg` | Reorg/finality math: a payment settled then invalidated by a shallow reorg → `phantom_credit`. (`docs/r-reorg-finality.md`) |
-| `psv.token_quirks` | Decimals (fail-loud) + fee-on-transfer: verify on the merchant's **net balance delta**, not the gross `Transfer` event. (`docs/t-token-quirks.md`) |
-| `psv.security_checks` | Game-theory guards: cross-chain replay binding (C0), asset-scoping / fake-token (N10), order-id entropy (N15), EOA-asset `eth_getCode` pre-flight (N16). (`docs/c-security-gametheory.md`) |
-| `psv.reconciliation` | Backup/restore ledger reconciliation: chain `Transfer`-log diff vs the system ledger → unreconciled credits (D3). (`docs/d3-reconciliation.md`) |
-| `psv.quote_option` | Quote-as-free-option: stale-quote value + reprice guard (G3). (`docs/g3-quote-option.md`) |
-| `psv.load` | Throughput/latency profiling (`run_profile`): p50/p95/max, error rate, throughput. |
+| `psv.anvil` | Strict JSON-RPC 2.0 client and local Anvil lifecycle/control. |
+| `psv.chain` | Exact ABI, block-pinned token reads and settlement-state types. |
+| `psv.payloads` | EIP-3009/EIP-712 authorization construction for local/test chains. |
+| `psv.safety` | Central fail-closed pre-signing policy for the reference SUT. |
+| `psv.sut` | Strict adapter contract and bounded, closeable HTTP implementation. |
+| `psv.reference_sut` | Calibration SUT with intentionally selectable damage behaviors. |
+| `psv.rails` | Versioned rail identity, runtime drift attestation and finality. |
+| `psv.reconciliation` | Exact settlement identities and ledger/chain credit diff. |
+| `psv.divergence` | Consistent, silent-loss, phantom-credit and underpaid verdicts. |
+| `psv.report` | Reconciliation report v2, provenance, reason codes and privacy policy. |
+| `psv.run_record` | Run-record v1.1 integrity checksum and concurrency-safe journal. |
+| `psv.load` | Staged load profiles, facilitator pooling and JSON metrics. |
 
-## The SUT adapter contract
+## SUT adapter contract
 
-Tests talk to the SUT **only** through these three calls, so the same suite runs
-against the reference SUT, a future in-house system, or a third party:
+- `POST /quote` returns order ID, amount, payee, asset, CAIP-2 network, domain and
+  expiry.
+- `POST /pay` accepts an order-bound authorization and returns exact order ID,
+  settlement flag and transaction hash.
+- `GET /status/{quoted-order-id}` returns exact order ID, paid flag, resource and
+  transaction hash.
 
-- `POST /quote` → `{ order_id, amount, payTo, asset, network, extra:{name,version} }`
-- `POST /pay`   `{ order_id, authorization:{ from,to,value,validAfter,validBefore,nonce,signature } }`
-  → `{ order_id, submitted_tx, settled }`
-- `GET  /status/{order_id}` → `{ order_id, paid, resource, submitted_tx }`
+The adapter rejects permissive truthiness, mismatched order IDs, duplicate JSON
+keys, oversized bodies and unsafe status paths. `HttpSutAdapter` owns and closes
+its connection client and supports a context-manager lifecycle.
 
-`settled`/`paid` express the system's **belief**. The harness never trusts it —
-it cross-checks against the chain.
+## Reproducibility and contracts
 
-## Why the oracle reads `AuthorizationUsed`, not `Transfer`
+On-chain tests isolate state with Anvil snapshots/reverts and a deterministic
+deployment. Offline tests inject hostile transports and synthetic receipts.
 
-Settlement truth is derived from the **balance delta** plus the
-`AuthorizationUsed(authorizer, nonce)` event and the on-chain `authorizationState`
-mapping — none of which change when a token's *transfer* event signature drifts.
-That independence is what lets the oracle stay correct while a `Transfer`-watching
-SUT goes blind (see SC1). If the oracle itself relied on `Transfer`, it would be
-just as blind as the system it audits.
+`psv` emits a v2 reconciliation report and v1.1 run record. Their checked-in JSON
+Schemas and migration notes are package data. Run checksums detect accidental
+modification but do not authenticate an attacker-controlled file; authenticity
+requires an external signature or trust anchor.
 
-## Determinism
-
-Every on-chain test runs inside an Anvil `evm_snapshot` taken before the test and
-reverted after (`chain_snapshot` fixture), so tests are order-independent and
-repeatable. The token deploys to a deterministic address (first deployer nonce),
-so addresses are stable across runs.
-
-## Testability without a chain
-
-`RpcClient` takes an injectable transport and the confirmer takes an injectable
-log fetcher, so the harness's decision logic — divergence grading, RPC request
-shape, ABI calldata, event-drift blindness — is fully unit-tested offline with no
-Anvil. On-chain tests (`-m onchain`) add the real end-to-end confirmation.
-
-## Phasing
-
-Each phase is gated behind pytest markers so the default run stays fast and
-chain-free; `-m onchain` / `-m load` add the real end-to-end confirmations.
-
-- **Phase 0 — foundation.** Harness, reference SUT, green happy-path, and the
-  first high-damage case: SC1 (event/ABI drift → `silent_loss`).
-- **Phase 1 — fault tolerance & settlement edges.** Reorg/finality (R), idempotency
-  / exactly-once (re-paid order must settle once), premature-confirmation delay.
-- **Phase 2 — reconciliation & quote option.** Backup/restore ledger diff (D3),
-  quote-as-free-option reprice guard (G3).
-- **Phase 3 — multi-token quirks.** Decimals + fee-on-transfer (T).
-- **Phase 4 — security / game-theory.** Cross-chain replay (C0), fake-token /
-  asset-scoping (N10), order-id entropy (N15), EOA-asset silent no-op (N16).
-- **Phase 5 — load.** Throughput / latency profiling.
-
-All cases are reproduced offline (decision logic) and, where they touch the chain,
-confirmed on-chain against Anvil.
+The public support boundary is machine-readable in `support-matrix.json`. CI
+rejects duplicate scenario IDs and missing registered pytest selectors.

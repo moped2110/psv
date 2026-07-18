@@ -45,6 +45,16 @@ def run_differential(
     one on-chain fact, differing beliefs mean at least one SUT is wrong — the
     ``failing`` map names those whose belief is a money-losing divergence.
     """
+    if not beliefs:
+        raise ValueError("beliefs must contain at least one SUT")
+    if any(not isinstance(name, str) or not name for name in beliefs):
+        raise ValueError("every SUT name must be a non-empty string")
+    if any(type(belief) is not bool for belief in beliefs.values()):
+        raise ValueError("every SUT belief must be a boolean")
+    if required_amount is not None and (
+        type(required_amount) is not int or not 0 <= required_amount <= 2**256 - 1
+    ):
+        raise ValueError("required_amount must be a uint256 or null")
     verdicts = {
         name: detect_payment_divergence(chain, believes, required_amount=required_amount)
         for name, believes in beliefs.items()

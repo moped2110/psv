@@ -5,7 +5,12 @@ from __future__ import annotations
 import pytest
 
 from psv.reconciliation import topic_addr
-from psv.reference_sut.confirmer import TOPIC_TRANSFER, EventWatchingConfirmer
+from psv.reference_sut.confirmer import (
+    TOPIC_AUTHORIZATION_USED,
+    TOPIC_TRANSFER,
+    EventWatchingConfirmer,
+    topic_nonce,
+)
 from psv.token_quirks import (
     from_atomic,
     net_after_fee,
@@ -33,6 +38,26 @@ def test_wrong_decimals_assumption_changes_the_amount() -> None:
 def test_to_atomic_rejects_unrepresentable() -> None:
     with pytest.raises(ValueError):
         to_atomic("0.0000001", 6)  # 7 dp at 6 decimals -> not representable
+    with pytest.raises(ValueError):
+        to_atomic("0.0000000000001", 6)  # fractional magnitude is entirely below one atom
+
+
+@pytest.mark.parametrize(
+    "human",
+    [True, 1.5, "not-a-number", "NaN", "Infinity", "-1", "1" * 1025],
+)
+def test_to_atomic_rejects_non_decimal_or_unbounded_inputs(human: object) -> None:
+    with pytest.raises(ValueError):
+        to_atomic(human, 6)  # type: ignore[arg-type]
+
+
+def test_to_atomic_rejects_uint256_overflow_before_huge_scaling() -> None:
+    with pytest.raises(ValueError, match="uint256"):
+        to_atomic("1e1000", 18)
+
+
+def test_negative_zero_is_normalized_without_becoming_negative() -> None:
+    assert to_atomic("-0", 6) == 0
 
 
 def test_negative_decimals_rejected() -> None:
@@ -41,6 +66,16 @@ def test_negative_decimals_rejected() -> None:
         to_atomic("1", -1)
     with pytest.raises(ValueError):
         from_atomic(1, -1)
+
+
+@pytest.mark.parametrize("atomic", [-1, True, 2**256])
+def test_from_atomic_rejects_values_outside_uint256(atomic: int) -> None:
+    with pytest.raises(ValueError, match="uint256"):
+        from_atomic(atomic, 6)
+
+
+def test_zero_decimal_token_has_canonical_integer_rendering() -> None:
+    assert from_atomic(42, 0) == "42"
 
 
 def test_net_after_fee() -> None:
@@ -64,17 +99,51 @@ def test_fee_token_fools_event_watcher_but_not_received_delta() -> None:
     fee_bps = 200
     net = net_after_fee(required, fee_bps)  # 9_800 actually credited
 
+    token = "0x" + "aa" * 20
+    tx_hash = "0x" + "bb" * 32
+    nonce = "0x" + "cc" * 32
+    transfer = {
+        "address": token,
+        "topics": [TOPIC_TRANSFER, topic_addr(PAYER), topic_addr(MERCHANT)],
+        "data": hex(required),
+        "transactionHash": tx_hash,
+        "blockNumber": "0x1",
+        "logIndex": "0x1",
+    }
+
     def fetch(addr, topics, from_block):
-        return [
+        return [transfer]  # gross event, not the net credited
+
+    receipt = {
+        "status": "0x1",
+        "transactionHash": tx_hash,
+        "to": token,
+        "blockNumber": "0x1",
+        "logs": [
             {
-                "topics": [TOPIC_TRANSFER, topic_addr(PAYER), topic_addr(MERCHANT)],
-                "data": hex(required),
-            }
-        ]  # gross event, not the net credited
+                "address": token,
+                "topics": [TOPIC_AUTHORIZATION_USED, topic_addr(PAYER), topic_nonce(nonce)],
+                "data": "0x",
+                "transactionHash": tx_hash,
+                "blockNumber": "0x1",
+                "logIndex": "0x0",
+            },
+            transfer,
+        ],
+    }
 
     confirmer = EventWatchingConfirmer(fetch_logs=fetch)
     assert (
-        confirmer.is_settled(token="0xt", payer=PAYER, payee=MERCHANT, min_value=required) is True
+        confirmer.is_settled(
+            token=token,
+            payer=PAYER,
+            payee=MERCHANT,
+            expected_value=required,
+            authorization_nonce=nonce,
+            submitted_tx=tx_hash,
+            receipt=receipt,
+        )
+        is True
     )
 
     # ...but verifying on the real received balance delta catches the underpayment.

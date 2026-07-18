@@ -1,160 +1,169 @@
-"""Offline tests for the read-only `psv reconcile` CLI + report rendering.
-
-No chain: the TokenView runs over an injected fake JSON-RPC transport (same pattern
-as test_rails_unit). Verifies the reconcile core, the JSON/Markdown report, the exit
-code, and the argparse wiring end-to-end (RPC swapped out via monkeypatch).
-"""
+"""CLI/report contract tests over strict synthetic receipt evidence."""
 
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
+from importlib.resources import files
+from pathlib import Path
 from typing import Any
 
-from psv.anvil import RpcClient
-from psv.chain import TokenView
+import pytest
+from reconcile_fakes import NONCE, PAYEE, PAYER, TX_HASH, strict_token
+
 from psv.cli import main, run_reconcile
-from psv.rails import get_rail, token_for_rail
-from psv.report import ReconReport, exit_code
-
-PAYER = "0x" + "11" * 20
-PAYEE = "0x" + "22" * 20
-NONCE = "0x" + "ab" * 32
-_SEL_BALANCE_OF = "70a08231"
-_SEL_AUTH_STATE = "e94a0102"
+from psv.rails import get_rail
+from psv.report import REPORT_VERSION, exit_code, validate_report_document
 
 
-def _fake_token(balances: dict[str, int], nonce_used: bool) -> TokenView:
-    def transport(req: dict[str, Any]) -> dict[str, Any]:
-        result = "0x0"
-        if req["method"] == "eth_call":
-            data = req["params"][0]["data"]
-            selector = data[2:10]
-            if selector == _SEL_BALANCE_OF:
-                who = ("0x" + data[-40:]).lower()
-                result = hex(balances.get(who, 0))
-            elif selector == _SEL_AUTH_STATE:
-                result = hex(1 if nonce_used else 0)
-        return {"jsonrpc": "2.0", "id": req["id"], "result": result}
-
-    return token_for_rail(get_rail("eurc-base"), RpcClient(transport=transport))
-
-
-def test_run_reconcile_phantom_credit_is_failure() -> None:
-    token = _fake_token({PAYER.lower(): 1000, PAYEE.lower(): 0}, nonce_used=False)
-    report = run_reconcile(
-        token,
-        get_rail("eurc-base"),
+def _report(*, paid: bool = True, **token_options: object):  # type: ignore[no-untyped-def]
+    rail = get_rail("mock-anvil")
+    return run_reconcile(
+        strict_token(rail, **token_options),
+        rail,
         payer=PAYER,
         payee=PAYEE,
         nonce=NONCE,
+        transaction_hash=TX_HASH,
+        log_index=0,
+        required_amount=100,
         payer_before=1000,
         payee_before=0,
-        sut_believes_paid=True,
+        sut_believes_paid=paid,
+        generated_at=datetime(2026, 7, 18, 12, tzinfo=UTC),
     )
-    assert report.kind == "phantom_credit"
-    assert report.is_failure is True
-    assert exit_code(report) == 1
 
 
-def test_run_reconcile_consistent_paid_is_clean() -> None:
-    token = _fake_token({PAYER.lower(): 900, PAYEE.lower(): 100}, nonce_used=True)
-    report = run_reconcile(
-        token,
-        get_rail("usdc-base"),
-        payer=PAYER,
-        payee=PAYEE,
-        nonce=NONCE,
-        payer_before=1000,
-        payee_before=0,
-        sut_believes_paid=True,
-    )
-    assert report.kind == "consistent_paid"
-    assert report.is_failure is False
-    assert exit_code(report) == 0
+def _argv(*extra: str, paid: bool = True) -> list[str]:
+    return [
+        "reconcile",
+        "--rail",
+        "mock-anvil",
+        "--payer",
+        PAYER,
+        "--payee",
+        PAYEE,
+        "--nonce",
+        NONCE,
+        "--tx-hash",
+        TX_HASH,
+        "--log-index",
+        "0",
+        "--required-amount",
+        "100",
+        "--payer-before",
+        "1000",
+        "--payee-before",
+        "0",
+        "--sut-paid" if paid else "--sut-unpaid",
+        *extra,
+    ]
 
 
-def test_report_json_shape() -> None:
-    token = _fake_token({PAYER.lower(): 900, PAYEE.lower(): 100}, nonce_used=True)
-    report = run_reconcile(
-        token,
-        get_rail("usdc-base"),
-        payer=PAYER,
-        payee=PAYEE,
-        nonce=NONCE,
-        payer_before=1000,
-        payee_before=0,
-        sut_believes_paid=False,  # silent loss
-    )
+def test_run_reconcile_verdict_and_exit_code() -> None:
+    clean = _report()
+    assert clean.kind == "consistent_paid" and exit_code(clean) == 0
+    silent = _report(paid=False)
+    assert silent.kind == "silent_loss" and exit_code(silent) == 1
+    underpaid = _report(payer_after=900, payee_after=90, event_value=100)
+    assert underpaid.kind == "underpaid_credit" and exit_code(underpaid) == 1
+
+
+def test_report_v2_is_deterministic_and_contains_full_provenance() -> None:
+    report = _report(paid=False)
     doc = json.loads(report.to_json())
-    assert doc["divergence"]["kind"] == "silent_loss"
-    assert doc["tool"]["readOnly"] is True
-    assert doc["rail"]["key"] == "usdc-base"
-    assert doc["payment"]["payer"] == PAYER
+    assert doc["reportVersion"] == REPORT_VERSION == "2.0"
+    assert doc["generatedAt"] == "2026-07-18T12:00:00+00:00"
+    assert doc["divergence"]["reasonCode"] == "PSV-RECON-SILENT-LOSS"
+    assert doc["payment"]["requiredAmount"] == 100
+    assert doc["payment"]["receivedAmount"] == 100
+    assert doc["evidence"]["transaction"]["hash"] == TX_HASH
+    assert doc["evidence"]["settlementBlock"]["number"] == 10
+    assert doc["privacy"]["policy"]
+    validate_report_document(doc)
+    assert report.to_json() == report.to_json()
 
 
-def test_report_markdown_is_readonly_and_explains() -> None:
-    report = ReconReport(
-        rail_key="usdc-base",
-        rail_label="USDC on Base",
-        chain_id=8453,
-        token_address="0xabc",
-        payer=PAYER,
-        payee=PAYEE,
-        nonce=NONCE,
-        sut_believes_paid=True,
-        kind="phantom_credit",
-        severity="critical",
-        message="PHANTOM CREDIT: …",
-        is_failure=True,
+def test_checked_in_json_schema_validates_report() -> None:
+    jsonschema = pytest.importorskip("jsonschema")
+    schema_path = files("psv.schemas").joinpath("reconciliation-report-v2.schema.json")
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    jsonschema.Draft202012Validator(schema).validate(_report().to_dict())
+
+
+def test_report_markdown_contains_amounts_and_chain_evidence() -> None:
+    md = _report(payer_after=900, payee_after=90, event_value=100).to_markdown()
+    assert "Read-only" in md and "DIVERGENCE" in md
+    assert "required 100; received 90" in md
+    assert TX_HASH in md and "Settlement block" in md
+
+
+def test_main_reconcile_end_to_end(monkeypatch: pytest.MonkeyPatch, capsys: Any) -> None:
+    rail = get_rail("mock-anvil")
+    token = strict_token(rail, receipt_status=0, payer_after=1000, payee_after=0)
+    monkeypatch.setattr("psv.cli.token_for_rail", lambda selected, rpc: token)
+    code = main(_argv())
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "PHANTOM CREDIT" in captured.out
+    assert captured.err == ""
+
+
+@pytest.mark.parametrize(
+    ("flag", "value"),
+    [
+        ("--payer", "0x1"),
+        ("--nonce", "0x1"),
+        ("--required-amount", "0"),
+        ("--required-amount", "-1"),
+        ("--payer-before", "-1"),
+        ("--rpc-url", "http://example.com:notaport"),
+        ("--rpc-timeout", "0"),
+    ],
+)
+def test_invalid_inputs_exit_2_without_traceback(flag: str, value: str, capsys: Any) -> None:
+    argv = _argv()
+    if flag in argv:
+        argv[argv.index(flag) + 1] = value
+    else:
+        argv.extend([flag, value])
+    assert main(argv) == 2
+    captured = capsys.readouterr()
+    assert "error" in captured.err.lower()
+    assert "Traceback" not in captured.err
+
+
+def test_unknown_rail_exits_2(capsys: Any) -> None:
+    argv = _argv()
+    argv[argv.index("--rail") + 1] = "nope"
+    assert main(argv) == 2
+    assert "unknown rail" in capsys.readouterr().err
+
+
+def test_report_output_failure_exits_2(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: Any
+) -> None:
+    rail = get_rail("mock-anvil")
+    monkeypatch.setattr("psv.cli.token_for_rail", lambda selected, rpc: strict_token(rail))
+
+    def fail_write(self: Path, data: bytes) -> int:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(Path, "write_bytes", fail_write)
+    assert main(_argv("--json", str(tmp_path / "report.json"))) == 2
+    captured = capsys.readouterr()
+    assert "output error" in captured.err and "Traceback" not in captured.err
+
+
+def test_audit_record_failure_overrides_clean_verdict(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: Any
+) -> None:
+    rail = get_rail("mock-anvil")
+    monkeypatch.setattr("psv.cli.token_for_rail", lambda selected, rpc: strict_token(rail))
+    monkeypatch.setattr(
+        "psv.run_record.write_run_record",
+        lambda record, log_dir: (_ for _ in ()).throw(OSError("read-only directory")),
     )
-    md = report.to_markdown()
-    assert "Read-only" in md
-    assert "PHANTOM CREDIT" in md
-    assert "DIVERGENCE" in md
-
-
-def test_main_reconcile_end_to_end(monkeypatch: Any) -> None:
-    # Swap the live RPC for a fake-transport token; exercise argparse + exit code.
-    token = _fake_token({PAYER.lower(): 1000, PAYEE.lower(): 0}, nonce_used=False)
-    monkeypatch.setattr("psv.cli.token_for_rail", lambda rail, rpc: token)
-    code = main(
-        [
-            "reconcile",
-            "--rail",
-            "eurc-base",
-            "--payer",
-            PAYER,
-            "--payee",
-            PAYEE,
-            "--nonce",
-            NONCE,
-            "--payer-before",
-            "1000",
-            "--payee-before",
-            "0",
-            "--sut-paid",
-        ]
-    )
-    assert code == 1  # phantom credit
-
-
-def test_main_unknown_rail_exits_2() -> None:
-    code = main(
-        [
-            "reconcile",
-            "--rail",
-            "nope",
-            "--payer",
-            PAYER,
-            "--payee",
-            PAYEE,
-            "--nonce",
-            NONCE,
-            "--payer-before",
-            "0",
-            "--payee-before",
-            "0",
-            "--sut-unpaid",
-        ]
-    )
-    assert code == 2
+    assert main(_argv("--log-dir", str(tmp_path))) == 2
+    captured = capsys.readouterr()
+    assert "audit-record error" in captured.err

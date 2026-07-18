@@ -14,14 +14,18 @@ import httpx
 from psv.anvil import RpcClient, RpcError
 from psv.sut import HttpSutAdapter, parse_quote
 
+PAYEE = "0x" + "11" * 20
+TOKEN = "0x" + "22" * 20
+TX_HASH = "0x" + "ab" * 32
+
 
 def test_parse_quote_normalizes_fields() -> None:
     q = parse_quote(
         {
             "order_id": "ord_1",
             "amount": "10000",
-            "payTo": "0xabc",
-            "asset": "0xtok",
+            "payTo": PAYEE,
+            "asset": TOKEN,
             "network": "eip155:84532",
             "extra": {"name": "USDC", "version": "2"},
         }
@@ -39,8 +43,8 @@ def test_http_adapter_round_trip() -> None:
                 json={
                     "order_id": "ord_x",
                     "amount": "10000",
-                    "payTo": "0xmerchant",
-                    "asset": "0xtok",
+                    "payTo": PAYEE,
+                    "asset": TOKEN,
                     "network": "eip155:84532",
                     "extra": {"name": "USDC", "version": "2"},
                 },
@@ -49,7 +53,7 @@ def test_http_adapter_round_trip() -> None:
             body = json.loads(request.content)
             assert body["order_id"] == "ord_x"
             return httpx.Response(
-                200, json={"order_id": "ord_x", "submitted_tx": "0xdead", "settled": True}
+                200, json={"order_id": "ord_x", "submitted_tx": TX_HASH, "settled": True}
             )
         if request.url.path == "/status/ord_x":
             return httpx.Response(
@@ -58,7 +62,7 @@ def test_http_adapter_round_trip() -> None:
                     "order_id": "ord_x",
                     "paid": True,
                     "resource": "premium",
-                    "submitted_tx": "0xdead",
+                    "submitted_tx": TX_HASH,
                 },
             )
         return httpx.Response(404)
@@ -99,10 +103,10 @@ def test_rpc_builds_well_formed_requests_and_increments_ids() -> None:
 def test_rpc_get_logs_filter_shape() -> None:
     send, seen = _fake_transport({"eth_getLogs": []})
     rpc = RpcClient(transport=send)
-    rpc.get_logs(address="0xtok", topics=["0xtopic", None], from_block=5, to_block="latest")
+    rpc.get_logs(address=TOKEN, topics=[TX_HASH, None], from_block=5, to_block="latest")
     flt = seen[0]["params"][0]
-    assert flt["address"] == "0xtok"
-    assert flt["topics"] == ["0xtopic", None]
+    assert flt["address"] == TOKEN
+    assert flt["topics"] == [TX_HASH, None]
     assert flt["fromBlock"] == "0x5" and flt["toBlock"] == "latest"
 
 
