@@ -1,6 +1,11 @@
 # Direct CI inputs. Regenerate the hashed lock after dependency changes:
-#   python -m piptools compile --generate-hashes --strip-extras \
-#     --output-file requirements/ci.txt requirements/ci.in
+#   uv pip compile --universal --python-version 3.11 --generate-hashes \
+#     --no-annotate -o requirements/ci.txt requirements/ci.in
+#
+# The lock must resolve for the LOWEST version in the CI matrix and carry markers
+# for the rest. A lock compiled on 3.12 silently omits dependencies that only
+# apply below it (jaraco-context pulls backports.tarfile on < 3.12), and
+# --require-hashes then fails on 3.11 with "must have their versions pinned".
 pytest>=8.0
 pytest-cov>=5.0
 mypy>=1.10
@@ -14,5 +19,9 @@ fastapi>=0.110
 uvicorn>=0.29
 build>=1.2
 hatchling>=1.27
+# Hatchling imports `editables` only when building an editable wheel, so a
+# resolver never sees it. CI installs the package with `pip install -e .`, which
+# fails with ModuleNotFoundError unless it is requested explicitly.
+editables>=0.5
 twine>=5.1
 pip-audit>=2.7
