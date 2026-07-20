@@ -106,8 +106,7 @@ class ReplayRecorder:
         return rec
 
     def playback(self) -> Iterator[Frame]:
-        for fr in sorted(self.frames, key=lambda f: f.seq):
-            yield fr
+        yield from sorted(self.frames, key=lambda f: f.seq)
 
     def fingerprint(self) -> str:
         canonical = json.dumps(

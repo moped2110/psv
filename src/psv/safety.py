@@ -8,6 +8,7 @@ tests.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -136,7 +137,6 @@ class SettlementSafetyPolicy:
 DEFAULT_SETTLEMENT_SAFETY_POLICY = SettlementSafetyPolicy()
 
 # --- v0.5 additions (Grok 4.3 + manual fix) ---
-import os
 
 MAINNET_CHAIN_IDS: dict[str, str] = {
     "eip155:1": "Ethereum",

@@ -1,8 +1,23 @@
+"""HTML divergence report export (T-14)."""
+
 import html
-# src/psv/report_html.py
-def generate_html(divergences):
+
+
+def render_divergence_html(divergences: list[dict]) -> str:
+    """Render a self-contained HTML divergence report."""
     rows = ""
     for d in divergences:
-        rows += f"<tr><td>{html.escape(str(d['id']}</td><td>{d['chain']}</td><td>{d['sut']}</td><td>{d['type']))}</td></tr>"
-    return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>PSV Report</title><style>table{{border-collapse:collapse;width:100%}}th,td{{border:1px solid #ccc;padding:8px}}</style></head><body><h1>Reconciliation Report</h1><table><tr><th>Payment-ID</th><th>Chain-Status</th><th>SUT-Status</th><th>Divergenz-Typ</th></tr>{rows}</table></body></html>"""
+        pid = html.escape(str(d.get("id", "?")))
+        chain = html.escape(str(d.get("chain", "?")))
+        sut = html.escape(str(d.get("sut", "?")))
+        dtype = html.escape(str(d.get("type", "?")))
+        rows += f"<tr><td>{pid}</td><td>{chain}</td><td>{sut}</td><td>{dtype}</td></tr>"
 
+    return (
+        '<!DOCTYPE html><html><head><meta charset="utf-8"><title>PSV Divergence Report</title>'
+        "<style>body{{font-family:system-ui,sans-serif;max-width:960px;margin:2em auto}}"
+        "table{{width:100%;border-collapse:collapse}}th,td{{padding:8px;border:1px solid #ccc}}"
+        "</style></head><body><h1>PSV Divergence Report</h1>"
+        "<table><thead><tr><th>ID</th><th>Chain</th><th>SUT</th><th>Type</th></tr></thead><tbody>"
+        f"{rows}</tbody></table></body></html>"
+    )
