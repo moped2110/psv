@@ -13,10 +13,10 @@ differently and are graded accordingly.
 """
 
 from __future__ import annotations
-from typing import final
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import final
 
 from .chain import SettlementTruth
 

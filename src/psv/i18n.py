@@ -1,4 +1,5 @@
 """Module — see functions for individual docstrings."""
+
 # src/psv/i18n.py
 from __future__ import annotations
 
@@ -82,7 +83,9 @@ def t(key: str, lang: str | None = None, **kwargs: Any) -> str:
         return template
 
 
-def finding(code: str, severity: str = "info", lang: str | None = None, **kwargs: Any) -> dict[str, str]:
+def finding(
+    code: str, severity: str = "info", lang: str | None = None, **kwargs: Any
+) -> dict[str, str]:
     sev_key = f"finding.severity.{severity}"
     msg_key = f"finding.{code}"
     return {
@@ -100,4 +103,3 @@ def format_findings(findings: list[dict[str, str]], lang: str | None = None) -> 
     crit = sum(1 for f in findings if f.get("severity_id") == "crit")
     lines.append(t("output.summary", lang=lang, count=len(findings), crit=crit))
     return "\n".join(lines)
-

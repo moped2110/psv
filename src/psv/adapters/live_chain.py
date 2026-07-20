@@ -1,8 +1,10 @@
 """Module — see functions for individual docstrings."""
+
 # src/psv/adapters/live_chain.py
 import time
+
 import requests
-from typing import Optional
+
 
 class LiveChainAdapter:
     def __init__(self, rpc_url: str, max_retries: int = 3, rate_limit: float = 0.2):
@@ -17,7 +19,7 @@ class LiveChainAdapter:
             time.sleep(self.rate_limit - (now - self.last_call))
         self.last_call = time.time()
 
-    def call(self, method: str, params: list) -> Optional[dict]:
+    def call(self, method: str, params: list) -> dict | None:
         self._rate_limit()
         payload = {"jsonrpc": "2.0", "method": method, "params": params, "id": 1}
         for attempt in range(self.max_retries):
@@ -28,6 +30,5 @@ class LiveChainAdapter:
             except Exception:
                 if attempt == self.max_retries - 1:
                     return None
-                time.sleep(2 ** attempt)
+                time.sleep(2**attempt)
         return None
-

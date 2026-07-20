@@ -7,10 +7,9 @@ also retains the block hash and ``removed`` flag needed to detect reorged logs.
 """
 
 from __future__ import annotations
-from typing import final
 
 from dataclasses import dataclass
-from typing import TypeAlias
+from typing import TypeAlias, final
 
 # Transfer(address indexed from, address indexed to, uint256 value) topic0.
 TOPIC_TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"

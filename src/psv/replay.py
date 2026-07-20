@@ -1,15 +1,17 @@
 """Module — see functions for individual docstrings."""
+
 # src/psv/replay.py
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
-import hashlib
-from dataclasses import dataclass, field, asdict
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 
 @dataclass
@@ -47,7 +49,7 @@ class Frame:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Frame":
+    def from_dict(cls, d: dict[str, Any]) -> Frame:
         return cls(
             seq=int(d["seq"]),
             ts=float(d["ts"]),
@@ -94,7 +96,7 @@ class ReplayRecorder:
         return path
 
     @staticmethod
-    def load(path: str | Path) -> "ReplayRecorder":
+    def load(path: str | Path) -> ReplayRecorder:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         rec = ReplayRecorder(session_id=data.get("session_id"))
         for fd in data.get("frames", []):
@@ -115,7 +117,7 @@ class ReplayRecorder:
         )
         return hashlib.sha256(canonical.encode()).hexdigest()
 
-    def assert_equal(self, other: "ReplayRecorder") -> None:
+    def assert_equal(self, other: ReplayRecorder) -> None:
         if self.fingerprint() != other.fingerprint():
             raise AssertionError(
                 f"replay mismatch: {self.session_id} != {other.session_id} "
@@ -189,4 +191,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

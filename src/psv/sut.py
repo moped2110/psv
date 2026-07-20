@@ -1,14 +1,13 @@
 """Strict adapter contract for a system under test (SUT)."""
 
 from __future__ import annotations
-from typing import final
 
 import json
 import math
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, final
 from urllib.parse import quote as quote_path_segment
 
 _UINT256_MAX = 2**256 - 1

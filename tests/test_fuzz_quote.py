@@ -1,12 +1,13 @@
 """Hypothesis-based fuzz tests for quote parsing and nonce handling (T-21)."""
+
 # tests/test_fuzz_quote.py
 from __future__ import annotations
 
-import re
 from typing import Any
 
 import pytest
-from hypothesis import given, settings, assume, strategies as st
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 # --- minimal encode/decode under test (mirrors psv quote wire format) ---
 
@@ -143,4 +144,3 @@ def test_decode_missing_keys(payload):
     assume(not all(k in payload for k in _QUOTE_KEYS))
     with pytest.raises(KeyError):
         decode_quote(payload)
-

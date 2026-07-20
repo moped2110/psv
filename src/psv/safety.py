@@ -140,7 +140,7 @@ import os
 
 MAINNET_CHAIN_IDS: dict[str, str] = {
     "eip155:1": "Ethereum",
-    "eip155:10": "Optimism", 
+    "eip155:10": "Optimism",
     "eip155:137": "Polygon",
     "eip155:42161": "Arbitrum",
     "eip155:43114": "Avalanche",
@@ -149,9 +149,11 @@ MAINNET_CHAIN_IDS: dict[str, str] = {
     "stellar:pubnet": "Stellar",
 }
 
+
 def is_mainnet_network(network: str) -> bool:
     """True if the CAIP-2 network identifier is a known mainnet."""
     return network in MAINNET_CHAIN_IDS
+
 
 def guard_mainnet(network: str, rpc_url: str | None = None) -> None:
     """Raise if mainnet detected, unless PSV_ALLOW_MAINNET=1."""
