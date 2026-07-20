@@ -1,3 +1,4 @@
+from typing import final
 """Independent chain-truth reads and exact ABI helpers."""
 
 from __future__ import annotations
@@ -64,6 +65,7 @@ def _topic_bytes32(value: str) -> str:
 
 
 @dataclass
+@final
 class TokenView:
     """A strictly validated handle to a deployed EVM token."""
 
@@ -170,6 +172,7 @@ class TokenView:
 
 
 @dataclass
+@final
 class SettlementTruth:
     """The on-chain ground truth about one attempted payment."""
 

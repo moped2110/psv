@@ -1,3 +1,4 @@
+from typing import final
 """Strict settlement identities and ledger reconciliation.
 
 One transaction can contain several token transfers.  A transaction hash is
@@ -16,6 +17,7 @@ TOPIC_TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523
 _UINT256_MAX = 2**256 - 1
 
 
+@final
 class ReconciliationError(ValueError):
     """A malformed or internally inconsistent settlement evidence set."""
 
@@ -69,6 +71,7 @@ def _addr_from_topic(topic: object, *, what: str) -> str:
 
 
 @dataclass(frozen=True, order=True)
+@final
 class SettlementIdentity:
     """Collision-free identity of one emitted settlement credit."""
 
@@ -88,6 +91,7 @@ class SettlementIdentity:
 
 
 @dataclass(frozen=True)
+@final
 class OnChainCredit:
     """A strictly decoded token credit and its reorg-relevant provenance."""
 

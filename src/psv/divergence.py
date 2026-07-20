@@ -1,3 +1,4 @@
+from typing import final
 """The divergence detector — the harness's core value.
 
 Black-box conformance asks "does the endpoint speak the protocol?". This asks the
@@ -20,6 +21,7 @@ from enum import Enum
 from .chain import SettlementTruth
 
 
+@final
 class DivergenceKind(str, Enum):
     """The ways chain truth and SUT belief can line up. The two consistent cases
     are healthy; the asymmetric ones are the bugs worth money. UNDERPAID_CREDIT is
@@ -32,6 +34,7 @@ class DivergenceKind(str, Enum):
     UNDERPAID_CREDIT = "underpaid_credit"  # SUT believes paid, but < required arrived
 
 
+@final
 class Severity(str, Enum):
     """Whether a divergence is benign (OK) or a money/security bug (CRITICAL)."""
 
@@ -40,6 +43,7 @@ class Severity(str, Enum):
 
 
 @dataclass
+@final
 class Divergence:
     """The graded verdict for one payment: which `kind` of (mis)match, how bad,
     and a human-readable explanation. `is_failure` is the gate for tests."""
