@@ -1,4 +1,5 @@
 """Alchemy/Infura RPC adapter with rate-limiting — T-06."""
+
 from __future__ import annotations
 
 import time
@@ -9,6 +10,7 @@ import requests
 
 class LiveChainAdapter:
     """Read-only RPC adapter with rate-limiting."""
+
     _rpc_url: str
     _calls_per_second: float
     _last_call: float

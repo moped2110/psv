@@ -1,4 +1,5 @@
 """Solana RPC adapter — T-09."""
+
 from __future__ import annotations
 
 import requests
@@ -6,6 +7,7 @@ import requests
 
 class SolanaAdapter:
     """Read-only Solana RPC adapter. Default: devnet."""
+
     _rpc_url: str
 
     def __init__(self, rpc_url: str = "https://api.devnet.solana.com") -> None:
