@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, future/v0.5-14-tasks]
   pull_request:
   schedule:
     - cron: "23 4 * * 1"

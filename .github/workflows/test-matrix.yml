@@ -2,9 +2,9 @@ name: Test Matrix
 
 on:
   push:
-    branches: [main]
+    branches: [main, future/v0.5-14-tasks]
   pull_request:
-    branches: [main]
+    branches: [main, future/v0.5-14-tasks]
 
 jobs:
   test:
