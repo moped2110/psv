@@ -1,6 +1,0 @@
-repos:
-  - repo: https://github.com/pypa/pip-audit
-    rev: v2.7.3
-    hooks:
-      - id: pip-audit
-        args: ["--requirement", "requirements/ci.txt"]

@@ -1,7 +1,7 @@
 # ADR-001: Chain-Truth Oracle Design
 
 **Status:** accepted  
-**Date:** 2026-07-20  
+**Date:** 2026-07-19  
 **Deciders:** Moses Brown, Hermes Agent
 
 ## Context
