@@ -1,0 +1,10 @@
+# docker-compose.yml
+version: "3.8"
+services:
+  psv:
+    build: .
+    image: ghcr.io/moped2110/psv:latest
+    ports:
+      - "8545:8545"
+    command: anvil --host 0.0.0.0
+
