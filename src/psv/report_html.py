@@ -1,4 +1,5 @@
 """HTML divergence report export (T-14)."""
+
 from __future__ import annotations
 
 import html
@@ -22,7 +23,7 @@ def render_divergence_html(divergences: list[dict[str, Any]]) -> str:
     )
     return (
         "<!DOCTYPE html>"
-        "<html><head><meta charset=\"utf-8\"><title>PSV Divergence Report</title>"
+        '<html><head><meta charset="utf-8"><title>PSV Divergence Report</title>'
         f"<style>{css}</style>"
         "</head><body><h1>PSV Divergence Report</h1>"
         "<table><thead><tr><th>ID</th><th>Chain</th><th>SUT</th><th>Type</th></tr></thead><tbody>"
