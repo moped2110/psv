@@ -1,3 +1,4 @@
+"""Module — see functions for individual docstrings."""
 # src/psv/adapters/live_chain.py
 import time
 import requests

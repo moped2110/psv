@@ -1,3 +1,4 @@
+"""Module — see functions for individual docstrings."""
 # src/psv/replay.py
 from __future__ import annotations
 

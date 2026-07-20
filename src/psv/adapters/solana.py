@@ -1,3 +1,4 @@
+"""Module — see functions for individual docstrings."""
 # src/psv/adapters/solana.py
 import requests
 from typing import Optional

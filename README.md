@@ -131,3 +131,29 @@ verification tool, not custody, a payment service, or legal/financial advice.
 ## License
 
 Apache-2.0.
+
+## v0.5 Features (July 2026)
+
+### Safety
+- `guard_mainnet()` — hard-block on mainnet unless `PSV_ALLOW_MAINNET=1`
+- `MAINNET_CHAIN_IDS` — 8 chains (EVM + Solana + Stellar)
+
+### Infrastructure
+- Docker image: `ghcr.io/moped2110/psv` with Anvil baked-in
+- CI matrix: Python 3.10/3.11/3.12 × Anvil variants
+- Prometheus metrics (divergence_count, reconciliation_latency)
+
+### New Modules
+- `psv.adapters.live_chain` — Alchemy/Infura RPC adapter with rate-limiting
+- `psv.adapters.solana` — Solana RPC adapter
+- `psv.i18n` — DE/EN CLI translations
+- `psv.replay` — session record/playback for deterministic regression
+- `psv.report_html` — HTML divergence visualization report
+
+### Quality
+- Hypothesis-based fuzz tests for quote parsing
+- Architecture Decision Record: Chain-Truth Oracle (ADR-001)
+- Finding catalog as structured YAML
+
+### Reviews
+- Grok 4.3 + Grok 4.5 + Claude Opus 4.5 + Claude Opus 4.8
