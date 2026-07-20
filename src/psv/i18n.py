@@ -61,6 +61,7 @@ _current_lang = DEFAULT_LANG
 
 
 def set_lang(lang: str) -> str:
+    """Set the active display language (en, de). Returns the normalized code."""
     global _current_lang
     normalized = (lang or DEFAULT_LANG).lower().strip()
     if normalized not in _MESSAGES:
@@ -70,10 +71,12 @@ def set_lang(lang: str) -> str:
 
 
 def get_lang() -> str:
+    """Return the currently active language code."""
     return _current_lang
 
 
 def t(key: str, lang: str | None = None, **kwargs: Any) -> str:
+    """Translate a message key into the target language, filling {placeholders} from kwargs."""
     use = (lang or _current_lang).lower()
     table = _MESSAGES.get(use) or _MESSAGES[DEFAULT_LANG]
     template = table.get(key) or _MESSAGES[DEFAULT_LANG].get(key) or key
@@ -86,6 +89,7 @@ def t(key: str, lang: str | None = None, **kwargs: Any) -> str:
 def finding(
     code: str, severity: str = "info", lang: str | None = None, **kwargs: Any
 ) -> dict[str, str]:
+    """Build a structured finding with localised severity label and message."""
     sev_key = f"finding.severity.{severity}"
     msg_key = f"finding.{code}"
     return {
@@ -97,6 +101,7 @@ def finding(
 
 
 def format_findings(findings: list[dict[str, str]], lang: str | None = None) -> str:
+    """Format a list of finding dicts into a human-readable console report."""
     if not findings:
         return t("output.no_findings", lang=lang)
     lines = [f"[{f.get('severity', '?')}] {f.get('message', '')}" for f in findings]

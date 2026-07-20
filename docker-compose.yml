@@ -1,6 +1,0 @@
-services:
-  psv:
-    build: .
-    ports:
-      - "8545:8545"
-    command: anvil --host 127.0.0.1

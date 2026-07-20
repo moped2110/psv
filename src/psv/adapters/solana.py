@@ -11,6 +11,7 @@ class SolanaAdapter:
     _rpc_url: str
 
     def __init__(self, rpc_url: str = "https://api.devnet.solana.com") -> None:
+        """Create adapter targeting a Solana JSON-RPC endpoint (default: devnet)."""
         self._rpc_url = rpc_url
 
     def get_balance(self, address: str) -> int | None:

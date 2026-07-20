@@ -40,6 +40,7 @@ class Frame:
     system_belief: SystemBelief
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize this Frame to a plain dict for JSON encoding."""
         return {
             "seq": self.seq,
             "ts": self.ts,
@@ -50,6 +51,7 @@ class Frame:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Frame:
+        """Reconstruct a Frame from a serialized dict."""
         return cls(
             seq=int(d["seq"]),
             ts=float(d["ts"]),
@@ -61,6 +63,7 @@ class Frame:
 
 class ReplayRecorder:
     def __init__(self, session_id: str | None = None) -> None:
+        """Create a replay recorder with an optional session identifier."""
         self.session_id = session_id or time.strftime("%Y%m%dT%H%M%SZ")
         self.frames: list[Frame] = []
         self._seq = 0
@@ -71,6 +74,7 @@ class ReplayRecorder:
         system_belief: SystemBelief,
         label: str = "",
     ) -> Frame:
+        """Capture a divergence snapshot (chain truth + system belief)."""
         fr = Frame(
             seq=self._seq,
             ts=time.time(),
@@ -83,6 +87,7 @@ class ReplayRecorder:
         return fr
 
     def dump(self, path: str | Path) -> Path:
+        """Write all recorded frames to a JSON file at the given path."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
@@ -97,6 +102,7 @@ class ReplayRecorder:
 
     @staticmethod
     def load(path: str | Path) -> ReplayRecorder:
+        """Load a replay session from a JSON file."""
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         rec = ReplayRecorder(session_id=data.get("session_id"))
         for fd in data.get("frames", []):
@@ -106,9 +112,11 @@ class ReplayRecorder:
         return rec
 
     def playback(self) -> Iterator[Frame]:
+        """Yield all recorded frames in sequential order."""
         yield from sorted(self.frames, key=lambda f: f.seq)
 
     def fingerprint(self) -> str:
+        """Return a deterministic SHA-256 hash of all frames for regression comparison."""
         canonical = json.dumps(
             [f.to_dict() for f in self.frames],
             sort_keys=True,
@@ -117,6 +125,7 @@ class ReplayRecorder:
         return hashlib.sha256(canonical.encode()).hexdigest()
 
     def assert_equal(self, other: ReplayRecorder) -> None:
+        """Raise AssertionError if this session's fingerprint differs from another's."""
         if self.fingerprint() != other.fingerprint():
             raise AssertionError(
                 f"replay mismatch: {self.session_id} != {other.session_id} "
@@ -125,6 +134,7 @@ class ReplayRecorder:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI entry point for recording, playing back, fingerprinting, and diffing replay sessions."""
     p = argparse.ArgumentParser(prog="psv-replay", description="PSV replay recorder/playback")
     sub = p.add_subparsers(dest="cmd", required=True)
 

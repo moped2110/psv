@@ -10,12 +10,15 @@ except ImportError:
 
     class _Noop:
         def inc(self, *a: Any, **kw: Any) -> None:
+            """Counter increment (no-op when prometheus_client is absent)."""
             pass
 
         def observe(self, *a: Any, **kw: Any) -> None:
+            """Histogram observation (no-op when prometheus_client is absent)."""
             pass
 
         def set(self, *a: Any, **kw: Any) -> None:
+            """Gauge setter (no-op when prometheus_client is absent)."""
             pass
 
     Counter = Gauge = Histogram = _Noop

@@ -16,6 +16,7 @@ class LiveChainAdapter:
     _last_call: float
 
     def __init__(self, rpc_url: str, calls_per_second: float = 10.0) -> None:
+        """Create adapter targeting an EVM JSON-RPC endpoint with rate cap."""
         self._rpc_url = rpc_url
         self._calls_per_second = calls_per_second
         self._last_call = 0.0

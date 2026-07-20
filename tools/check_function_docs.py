@@ -15,24 +15,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ROOTS = (ROOT / "src", ROOT / "tools")
 
-# --- Modules where docstrings are not enforced (auto-generated / external adapters) ---
-_SKIP_MODULES: tuple[str, ...] = (
-    "src/psv/i18n.py",
-    "src/psv/replay.py",
-    "src/psv/metrics.py",
-    "src/psv/report_html.py",
-    "src/psv/adapters/live_chain.py",
-    "src/psv/adapters/solana.py",
-)
-
-
-def _should_check(path: Path) -> bool:
-    """Return False if path is in the skip list, True otherwise."""
-    try:
-        return str(path.relative_to(ROOT)) not in _SKIP_MODULES
-    except ValueError:
-        return True
-
 
 @dataclass(frozen=True, order=True)
 class MissingFunctionDoc:
@@ -49,9 +31,9 @@ def python_files(roots: Iterable[Path]) -> list[Path]:
 
 
 def missing_function_docs(path: Path) -> list[MissingFunctionDoc]:
-    """Return all functions without a docstring in one Python file."""
+    """Return every function in one module that lacks a non-empty docstring."""
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     findings: list[MissingFunctionDoc] = []
-    tree = ast.parse(path.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -63,22 +45,35 @@ def missing_function_docs(path: Path) -> list[MissingFunctionDoc]:
 
 def check_function_docs(roots: Iterable[Path] = DEFAULT_ROOTS) -> list[MissingFunctionDoc]:
     """Return missing-docstring findings across all production scan roots."""
-    return [
-        finding
-        for path in python_files(roots)
-        if _should_check(path)
-        for finding in missing_function_docs(path)
-    ]
+    return [finding for path in python_files(roots) for finding in missing_function_docs(path)]
 
 
 def function_count(roots: Iterable[Path] = DEFAULT_ROOTS) -> int:
     """Count all synchronous and asynchronous functions in the scan roots."""
     total = 0
     for path in python_files(roots):
-        if not _should_check(path):
-            continue
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                total += 1
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        total += sum(
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) for node in ast.walk(tree)
+        )
     return total
+
+
+def main() -> int:
+    """Report undocumented functions and return a shell-friendly exit status."""
+    findings = check_function_docs()
+    if findings:
+        print("Function documentation check failed:")
+        for finding in findings:
+            try:
+                display = finding.path.relative_to(ROOT)
+            except ValueError:
+                display = finding.path
+            print(f"- {display}:{finding.line}: {finding.name}")
+        return 1
+    print(f"Function documentation check passed ({function_count()} functions).")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
