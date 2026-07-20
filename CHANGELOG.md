@@ -66,3 +66,13 @@ chain-truth oracle, divergence detector, local reference SUT, reconciliation,
 reorg, quote-option, token-quirk, security, differential, and load scenarios.
 All transaction-producing tests use local Anvil funds only; the CLI is
 read-only.
+
+## v0.5.0 (unreleased)
+
+### Added
+- **T03:** Mainnet safety gate (`guard_mainnet()`, `PSV_ALLOW_MAINNET=1`)
+- **T03:** `MAINNET_CHAIN_IDS` dict (8 chains: EVM + Solana + Stellar)
+
+### Changed
+- Safety module extended with `is_mainnet_network()`
+

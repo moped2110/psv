@@ -1,0 +1,33 @@
+name: Test Matrix
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+        with-anvil: [true, false]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Foundry (Anvil)
+        if: matrix.with-anvil
+        uses: foundry-rs/foundry-toolchain@v1
+      - name: Install deps
+        run: pip install -e ".[dev]"
+      - name: Run tests
+        run: |
+          if [ "${{ matrix.with-anvil }}" = "true" ]; then
+            pytest -m "not onchain" --ignore=tests/test_onchain_facilitator.py
+          else
+            pytest -m "not onchain" --ignore=tests/test_onchain_facilitator.py --ignore=tests/test_http_adapter_live.py
+          fi

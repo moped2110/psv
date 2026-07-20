@@ -1,0 +1,48 @@
+# Structured finding catalog for CI integration (T-15)
+version: 1
+findings:
+  - id: SC1
+    name: "Contract/Event Drift"
+    severity: critical
+    description: "Token changes settlement event signature → system goes blind → silent loss"
+    check: "Event signature must match expected ABI"
+  - id: D3
+    name: "Backup/Restore vs Chain"
+    severity: critical
+    description: "Ledger rollback forgets on-chain payment → reconciliation finds gap"
+    check: "Post-restore reconciliation must not have unaccounted Chain-Truth entries"
+  - id: G3
+    name: "Quote as Free Option"
+    severity: major
+    description: "Locked quote honored after price change → free call option"
+    check: "Repricing guard must reject stale quotes"
+  - id: R
+    name: "Reorg Invalidation"
+    severity: critical
+    description: "Settled payment undone by chain reorg → phantom credit"
+    check: "Finality-by-confirmations: wait N blocks before credit"
+  - id: T
+    name: "Token Quirks"
+    severity: major
+    description: "Fee-on-transfer token: event shows brutto, credit is netto → underpaid"
+    check: "Token decimals + fee structure must match Chain-Truth"
+  - id: C0
+    name: "Cross-Chain Replay"
+    severity: critical
+    description: "Payment signed for chain A replayed on chain B"
+    check: "ChainId must be validated against signer"
+  - id: N10
+    name: "Fake Token Whitelist"
+    severity: critical
+    description: "Attacker deploys token with same name/symbol → whitelist bypass"
+    check: "Token address must be the canonical Circle deployment"
+  - id: N15
+    name: "Order-ID Predictability"
+    severity: major
+    description: "Sequential order IDs allow attacker to guess next payment"
+    check: "Payment IDs must be non-guessable"
+  - id: N16
+    name: "EOA Asset"
+    severity: critical
+    description: "Payment in non-contract address → settlement impossible"
+    check: "Asset must have contract code deployed"
