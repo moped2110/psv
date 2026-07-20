@@ -1,34 +1,46 @@
-"""Module — see functions for individual docstrings."""
+"""Alchemy/Infura RPC adapter with rate-limiting — T-06."""
+from __future__ import annotations
 
-# src/psv/adapters/live_chain.py
 import time
+from typing import Any
 
 import requests
 
 
 class LiveChainAdapter:
-    def __init__(self, rpc_url: str, max_retries: int = 3, rate_limit: float = 0.2):
-        self.rpc_url = rpc_url
-        self.max_retries = max_retries
-        self.rate_limit = rate_limit
-        self.last_call = 0.0
+    """Read-only RPC adapter with rate-limiting."""
+    _rpc_url: str
+    _calls_per_second: float
+    _last_call: float
 
-    def _rate_limit(self):
-        now = time.time()
-        if now - self.last_call < self.rate_limit:
-            time.sleep(self.rate_limit - (now - self.last_call))
-        self.last_call = time.time()
+    def __init__(self, rpc_url: str, calls_per_second: float = 10.0) -> None:
+        self._rpc_url = rpc_url
+        self._calls_per_second = calls_per_second
+        self._last_call = 0.0
 
-    def call(self, method: str, params: list) -> dict | None:
+    def _rate_limit(self) -> None:
+        """Sleep if needed to stay within rate limit."""
+        elapsed = time.time() - self._last_call
+        min_gap = 1.0 / self._calls_per_second
+        if elapsed < min_gap:
+            time.sleep(min_gap - elapsed)
+        self._last_call = time.time()
+
+    def call(self, method: str, params: list[Any] | None = None) -> dict[str, Any] | None:
+        """Make a JSON-RPC call. Returns None on failure."""
         self._rate_limit()
-        payload = {"jsonrpc": "2.0", "method": method, "params": params, "id": 1}
-        for attempt in range(self.max_retries):
-            try:
-                r = requests.post(self.rpc_url, json=payload, timeout=10)
-                r.raise_for_status()
-                return r.json()
-            except Exception:
-                if attempt == self.max_retries - 1:
-                    return None
-                time.sleep(2**attempt)
-        return None
+        try:
+            payload: dict[str, Any] = {
+                "jsonrpc": "2.0",
+                "method": method,
+                "params": params or [],
+                "id": 1,
+            }
+            resp = requests.post(self._rpc_url, json=payload, timeout=30)
+            resp.raise_for_status()
+            data: dict[str, Any] = resp.json()
+            if "error" in data:
+                return None
+            return data
+        except requests.RequestException:
+            return None

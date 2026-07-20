@@ -1,17 +1,34 @@
-"""Module — see functions for individual docstrings."""
-# src/psv/adapters/solana.py
+"""Solana RPC adapter — T-09."""
+from __future__ import annotations
 
 import requests
 
 
 class SolanaAdapter:
-    def __init__(self, rpc_url: str = "https://api.devnet.solana.com"):
-        self.rpc_url = rpc_url
+    """Read-only Solana RPC adapter. Default: devnet."""
+    _rpc_url: str
 
-    def get_balance(self, pubkey: str) -> int | None:
-        payload = {"jsonrpc": "2.0", "id": 1, "method": "getBalance", "params": [pubkey]}
+    def __init__(self, rpc_url: str = "https://api.devnet.solana.com") -> None:
+        self._rpc_url = rpc_url
+
+    def get_balance(self, address: str) -> int | None:
+        """Get SOL balance in lamports. Returns None on failure."""
         try:
-            r = requests.post(self.rpc_url, json=payload, timeout=10)
-            return r.json().get("result", {}).get("value")
-        except Exception:
+            resp = requests.post(
+                self._rpc_url,
+                json={
+                    "jsonrpc": "2.0",
+                    "method": "getBalance",
+                    "params": [address],
+                    "id": 1,
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            result = data.get("result")
+            if isinstance(result, dict):
+                return int(result.get("value", 0))
+            return int(result) if result is not None else None
+        except requests.RequestException:
             return None

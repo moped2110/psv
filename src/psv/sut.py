@@ -7,7 +7,7 @@ import math
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, final
+from typing import Any
 from urllib.parse import quote as quote_path_segment
 
 _UINT256_MAX = 2**256 - 1
@@ -20,13 +20,11 @@ _MAX_TEXT_CHARS = 16_384
 _MAX_RESPONSE_BYTES = 1024 * 1024
 
 
-@final
 class SutAdapterError(ValueError):
     """The remote SUT violated the adapter's HTTP or JSON wire contract."""
 
 
 @dataclass(frozen=True)
-@final
 class Quote:
     """A normalized, validated x402 ``accepts`` entry."""
 
@@ -48,7 +46,6 @@ class Quote:
 
 
 @dataclass(frozen=True)
-@final
 class PayResult:
     """Normalized result of submitting an authorization for an order."""
 
@@ -58,7 +55,6 @@ class PayResult:
 
 
 @dataclass(frozen=True)
-@final
 class Status:
     """Normalized read-only payment and resource state for an order."""
 
@@ -68,7 +64,6 @@ class Status:
     submitted_tx: str | None
 
 
-@final
 class SutAdapter(ABC):
     """Minimal HTTP contract every System-under-Test must satisfy."""
 
@@ -245,7 +240,6 @@ def _decode_response(response: Any, what: str) -> dict[str, Any]:
 
 
 @dataclass
-@final
 class HttpSutAdapter(SutAdapter):
     """Drive a SUT over bounded HTTP quote/pay/status endpoints."""
 
