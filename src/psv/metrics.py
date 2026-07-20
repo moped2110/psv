@@ -1,9 +1,13 @@
-# src/psv/metrics.py
+"""Prometheus metrics (optional)."""
 try:
-    from prometheus_client import Counter, Histogram, Gauge
-    divergence_count = Counter("psv_divergence_count", "Total divergences")
-    reconciliation_latency_seconds = Histogram("psv_reconciliation_latency_seconds", "Reconciliation latency")
-    settlement_histogram = Histogram("psv_settlement_seconds", "Settlement time")
+    from prometheus_client import Counter, Gauge, Histogram
 except ImportError:
-    divergence_count = reconciliation_latency_seconds = settlement_histogram = None
+    class _Noop:
+        def inc(self, *a, **kw): pass
+        def observe(self, *a, **kw): pass
+        def set(self, *a, **kw): pass
+    Counter = Gauge = Histogram = _Noop
 
+divergence_count = Counter("psv_divergence_total", "Total divergences detected")
+reconciliation_latency = Histogram("psv_reconciliation_seconds", "Reconciliation duration")
+settlement_count = Counter("psv_settlement_total", "Total settlements verified")

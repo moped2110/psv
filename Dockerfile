@@ -1,12 +1,6 @@
-# Dockerfile
-FROM python:3.11-slim AS base
+FROM python:3.11-slim
 WORKDIR /app
 COPY pyproject.toml .
-RUN pip install --no-cache-dir -r requirements.txt
-
-FROM ghcr.io/foundry-rs/foundry:latest AS foundry
-FROM base
-COPY --from=foundry /usr/local/bin/anvil /usr/local/bin/anvil
-COPY src ./src
+RUN pip install --no-cache-dir -e "." 2>/dev/null || pip install --no-cache-dir .
+COPY src/ src/
 CMD ["python", "-m", "psv"]
-

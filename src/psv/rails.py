@@ -788,12 +788,3 @@ def reconcile_live(
             removed=selected_log.removed if selected_log else False,
         ),
     )
-
-# --- T07+T08: EURC + JPYC rails (Grok 4.3) ---
-# src/psv/rails.py
-RAILS = [
-    {"chain": "ethereum", "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "name": "USDC", "decimals": 6, "explorer_url": "https://etherscan.io/token/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"},
-    {"chain": "polygon", "address": "0x18ec0A5CeB209D9f92Bc6A69Bd8c3aAF808D798D", "name": "EURC", "decimals": 6, "explorer_url": "https://polygonscan.com/token/0x18ec0A5CeB209D9f92Bc6A69Bd8c3aAF808D798D"},
-    {"chain": "polygon", "address": "0x6AE7Dfc73E0dDE2aa99ac063dC338461B677aBd5", "name": "JPYC", "decimals": 18, "explorer_url": "https://polygonscan.com/token/0x6AE7Dfc73E0dDE2aa99ac063dC338461B677aBd5"},
-]
-

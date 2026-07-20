@@ -3,7 +3,7 @@ import requests
 from typing import Optional
 
 class SolanaAdapter:
-    def __init__(self, rpc_url: str = "https://api.mainnet-beta.solana.com"):
+    def __init__(self, rpc_url: str = "https://api.devnet.solana.com"):
         self.rpc_url = rpc_url
 
     def get_balance(self, pubkey: str) -> Optional[int]:

@@ -27,7 +27,7 @@ jobs:
       - name: Run tests
         run: |
           if [ "${{ matrix.with-anvil }}" = "true" ]; then
-            pytest -m "not onchain" --ignore=tests/test_onchain_facilitator.py
+            pytest -m "not onchain" 
           else
-            pytest -m "not onchain" --ignore=tests/test_onchain_facilitator.py --ignore=tests/test_http_adapter_live.py
+            pytest -m "not onchain"  --ignore=tests/test_http_adapter_live.py
           fi
