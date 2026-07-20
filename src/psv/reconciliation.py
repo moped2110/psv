@@ -1,4 +1,3 @@
-from typing import final
 """Strict settlement identities and ledger reconciliation.
 
 One transaction can contain several token transfers.  A transaction hash is
@@ -8,6 +7,7 @@ also retains the block hash and ``removed`` flag needed to detect reorged logs.
 """
 
 from __future__ import annotations
+from typing import final
 
 from dataclasses import dataclass
 from typing import TypeAlias

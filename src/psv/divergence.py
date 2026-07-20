@@ -1,4 +1,3 @@
-from typing import final
 """The divergence detector — the harness's core value.
 
 Black-box conformance asks "does the endpoint speak the protocol?". This asks the
@@ -14,6 +13,7 @@ differently and are graded accordingly.
 """
 
 from __future__ import annotations
+from typing import final
 
 from dataclasses import dataclass
 from enum import Enum

@@ -1,7 +1,7 @@
-from typing import final
 """Strict adapter contract for a system under test (SUT)."""
 
 from __future__ import annotations
+from typing import final
 
 import json
 import math
