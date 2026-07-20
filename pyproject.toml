@@ -7,7 +7,7 @@ name = "psv"
 version = "0.1.0"
 description = "System-level verification harness for complete x402 payment systems (settlement, RPC, reconciliation, load)."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = "Apache-2.0"
 authors = [{ name = "moped2110" }]
 keywords = ["x402", "payments", "system-test", "verification", "anvil", "eip-3009"]
