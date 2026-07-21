@@ -22,7 +22,7 @@
     {"id": "PSV-RAIL-JPYC-POLYGON", "phase": "phase-3", "severity": "P0", "test": "tests/test_rails_unit.py::test_known_rails_have_reviewed_runtime_metadata", "environment": "mainnet-read-only", "status": "passive"},
     {"id": "PSV-RD-001", "phase": "roadmap", "severity": "P0", "test": null, "environment": "anvil", "status": "planned"},
     {"id": "PSV-RD-002", "phase": "roadmap", "severity": "P1", "test": "tests/test_rails_unit.py::test_read_only_drift_check_exports_pinned_runtime_observation", "environment": "mainnet-read-only", "status": "implemented"},
-    {"id": "PSV-RD-003", "phase": "roadmap", "severity": "P1", "test": null, "environment": "anvil", "status": "planned"},
+    {"id": "PSV-RD-003", "phase": "roadmap", "severity": "P1", "test": "tests/test_multi_asset_race_unit.py::test_same_block_other_asset_transfer_is_not_mis_attributed", "environment": "offline", "status": "implemented"},
     {"id": "PSV-RD-004", "phase": "roadmap", "severity": "P1", "test": "tests/test_svm_oracle_unit.py::test_successful_transfer_is_consistent_paid", "environment": "local-svm", "status": "implemented"},
     {"id": "PSV-RD-005", "phase": "roadmap", "severity": "P2", "test": null, "environment": "mainnet-read-only", "status": "planned"},
     {"id": "PSV-RD-006", "phase": "roadmap", "severity": "P2", "test": "tests/test_metered_unit.py::test_settlement_above_cap_is_over_authorized", "environment": "offline", "status": "implemented"},

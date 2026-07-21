@@ -224,3 +224,33 @@ def find_unreconciled(
             credit.asset,
         ),
     )
+
+
+def reconcile_asset_scoped(
+    transfers: list[dict[str, object]],
+    ledger_entries: set[LedgerEntry],
+    *,
+    chain_id: int,
+    expected_asset: str,
+    expected_payee: str | None = None,
+) -> list[OnChainCredit]:
+    """Reconcile only ``expected_asset`` credits from a possibly multi-asset snapshot.
+
+    :func:`find_unreconciled` fails closed on any cross-asset log — safe, but it cannot
+    process a realistic block that also carries unrelated tokens. This scopes such a
+    snapshot to the expected asset first, so a same-block transfer of a *different* asset to
+    the same payee is excluded rather than mis-attributed as this order's payment: the
+    multi-asset settlement race (PSV-RD-003). Cross-recipient logs within the scoped asset
+    still fail closed, and every log is decoded (and validated) exactly as in the strict path.
+    """
+    asset = _address(expected_asset, what="expected asset")
+    scoped = [
+        log for log in transfers if decode_transfer_log(log, chain_id=chain_id).asset == asset
+    ]
+    return find_unreconciled(
+        scoped,
+        ledger_entries,
+        chain_id=chain_id,
+        expected_asset=asset,
+        expected_payee=expected_payee,
+    )
