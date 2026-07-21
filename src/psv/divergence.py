@@ -29,7 +29,9 @@ class DivergenceKind(str, Enum):
     CONSISTENT_UNPAID = "consistent_unpaid"
     SILENT_LOSS = "silent_loss"  # funds moved on-chain, SUT believes unpaid
     PHANTOM_CREDIT = "phantom_credit"  # SUT believes paid, no funds moved
-    UNDERPAID_CREDIT = "underpaid_credit"  # SUT believes paid, but < required arrived
+    UNDERPAID_CREDIT = "underpaid_credit"  # SUT believes paid, but < required arrived (exact)
+    # SUT believes paid, but > authorized maximum left the payer (upto/metered scheme)
+    OVER_AUTHORIZED_SETTLEMENT = "over_authorized_settlement"
 
 
 class Severity(str, Enum):
@@ -119,6 +121,81 @@ def detect_payment_divergence(
             "PHANTOM CREDIT: the SUT believes the order is paid, but no funds moved "
             f"on-chain (nonce consumed={chain.nonce_consumed}, payee delta "
             f"{chain.payee_delta:+d}). The resource is handed out for free."
+        ),
+    )
+
+
+def detect_metered_divergence(
+    chain: SettlementTruth,
+    sut_believes_paid: bool,
+    authorized_max: int,
+) -> Divergence:
+    """Compare on-chain truth against the SUT's belief for an ``upto`` (metered) payment.
+
+    The ``upto`` scheme authorizes a *maximum* (``authorized_max``); the resource server
+    settles the actual usage, which MUST be ``<=`` that cap, and the authorization is
+    consumed at most once (x402 ``specs/schemes/upto``). This is the mirror image of
+    :func:`detect_payment_divergence`'s exact-scheme ``required_amount`` check: there,
+    receiving *less* than required is the bug; here, moving *more* than authorized is —
+    receiving less than the cap is a healthy partial settlement, the whole point of
+    metered billing.
+
+    The bug unique to ``upto`` is ``OVER_AUTHORIZED_SETTLEMENT``: more than the cap left
+    the payer. Replay of a consumed authorization (the "settle at most once" violation)
+    needs no separate kind — the second settlement moves nothing on-chain, so a SUT that
+    credits it again surfaces as ``PHANTOM_CREDIT``, exactly as this detector returns for
+    the no-funds-moved case.
+    """
+    if type(authorized_max) is not int or authorized_max < 0:
+        raise ValueError("authorized_max must be a non-negative integer (token base units)")
+    moved = chain.funds_moved
+    if moved and sut_believes_paid:
+        if chain.payee_delta > authorized_max:
+            over = chain.payee_delta - authorized_max
+            return Divergence(
+                DivergenceKind.OVER_AUTHORIZED_SETTLEMENT,
+                Severity.CRITICAL,
+                (
+                    "OVER-AUTHORIZED SETTLEMENT: the SUT credited an upto (metered) order, but "
+                    f"the merchant received {chain.payee_delta:d} on-chain against an authorized "
+                    f"maximum of {authorized_max:d} — over by {over:d}. The facilitator settled "
+                    "beyond the client's cap; an upto authorization MUST settle at most the "
+                    "authorized maximum."
+                ),
+            )
+        return Divergence(
+            DivergenceKind.CONSISTENT_PAID,
+            Severity.OK,
+            (
+                f"Funds moved on-chain ({chain.payee_delta:d}) within the authorized maximum "
+                f"{authorized_max:d}, and the SUT correctly registered the metered payment."
+            ),
+        )
+    if not moved and not sut_believes_paid:
+        return Divergence(
+            DivergenceKind.CONSISTENT_UNPAID,
+            Severity.OK,
+            "No funds moved and the SUT correctly treats the metered order as unpaid.",
+        )
+    if moved and not sut_believes_paid:
+        return Divergence(
+            DivergenceKind.SILENT_LOSS,
+            Severity.CRITICAL,
+            (
+                "SILENT LOSS: the payer was debited and the merchant credited on-chain "
+                f"(payer {chain.payer_delta:+d}, payee {chain.payee_delta:+d}, nonce "
+                f"consumed={chain.nonce_consumed}), but the SUT believes the metered order is "
+                "unpaid. The customer paid and gets nothing."
+            ),
+        )
+    return Divergence(
+        DivergenceKind.PHANTOM_CREDIT,
+        Severity.CRITICAL,
+        (
+            "PHANTOM CREDIT: the SUT believes the metered order is paid, but no funds moved "
+            f"on-chain (nonce consumed={chain.nonce_consumed}, payee delta "
+            f"{chain.payee_delta:+d}). Either nothing settled, or a consumed upto "
+            "authorization was replayed and credited again. The resource is handed out free."
         ),
     )
 

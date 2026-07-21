@@ -25,7 +25,7 @@
     {"id": "PSV-RD-003", "phase": "roadmap", "severity": "P1", "test": null, "environment": "anvil", "status": "planned"},
     {"id": "PSV-RD-004", "phase": "roadmap", "severity": "P1", "test": null, "environment": "local-svm", "status": "planned"},
     {"id": "PSV-RD-005", "phase": "roadmap", "severity": "P2", "test": null, "environment": "mainnet-read-only", "status": "planned"},
-    {"id": "PSV-RD-006", "phase": "roadmap", "severity": "P2", "test": null, "environment": "offline", "status": "planned"},
+    {"id": "PSV-RD-006", "phase": "roadmap", "severity": "P2", "test": "tests/test_metered_unit.py::test_settlement_above_cap_is_over_authorized", "environment": "offline", "status": "implemented"},
     {"id": "PSV-RD-007", "phase": "roadmap", "severity": "P1", "test": "tests/test_load_throughput.py::test_concurrent_facilitator_pool_ramp_spike_soak_breakpoint_recovery", "environment": "load-anvil", "status": "implemented"},
     {"id": "PSV-RD-008", "phase": "roadmap", "severity": "P1", "test": null, "environment": "offline", "status": "planned"},
     {"id": "PSV-RD-009", "phase": "roadmap", "severity": "P1", "test": null, "environment": "not-applicable", "status": "planned"},
