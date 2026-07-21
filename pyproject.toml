@@ -72,6 +72,11 @@ packages = ["src/psv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# psv is imported from src/, and the tests import the top-level `tools` package from the
+# repo root. `python -m pytest` (how CI runs) puts the root on sys.path implicitly; a bare
+# `pytest` does not, so the tools-importing tests failed to collect. Pin both paths here so
+# either invocation works and no PYTHONPATH prefix is needed.
+pythonpath = ["src", "."]
 markers = [
     "onchain: requires a running Anvil + deployed token (run on a dev machine, not in CI sandbox)",
     "load: load/stress profiles — never in the standard CI run",
