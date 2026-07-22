@@ -29,10 +29,16 @@ fails closed.
 - Correct behavior of a customer SUT that was not the target of the run.
 - Availability or correctness of third-party RPC providers, facilitators, bridges,
   wallets, or live token deployments outside the evidence block captured for a run.
-- Planned scenarios, including SVM, additional rails, partial-settlement semantics,
-  multi-asset races, website integration, and operational disclosure workflows.
+- Genuinely planned scenarios: additional rails (JPYC/Polygon is registered but
+  uncalibrated), the on-chain `local-svm` SVM settlement environment, website integration,
+  and operational disclosure workflows.
 - Custody, live payouts, or mainnet signing. Those behaviors are intentionally outside
   the product scope.
+
+The offline SVM settlement oracle, the `upto` metered partial-settlement rule, the
+multi-asset settlement race, and reorg-aware finality are `implemented` and certified by an
+offline green run (see the registry); for SVM, only the live on-chain environment remains
+planned.
 
 Only entries with status `implemented` are active certifications. `passive` means
 metadata or local domain behavior exists but no live deployment claim is made.
