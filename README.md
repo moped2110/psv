@@ -120,6 +120,40 @@ Rail drift can be checked without moving value:
 psv rail-drift --rail usdc-base --rpc-url https://mainnet.base.org
 ```
 
+## MCP server (for coding agents)
+
+`psv-mcp` exposes the read-only surface over the Model Context Protocol, so an
+agent can ask for the settlement proof from inside an editor instead of
+assembling a long command line by hand.
+
+```bash
+pip install "psv[mcp]"
+```
+
+```jsonc
+{
+  "mcpServers": {
+    "psv": {
+      "command": "psv-mcp",
+      "env": { "PSV_RPC_URL": "https://sepolia.base.org" }
+    }
+  }
+}
+```
+
+Three tools: `list_rails` (offline — find the rail key), `reconcile_settlement`
+(prove one settlement and name the divergence, with the evidence it was proven
+from) and `rail_drift` (observe a rail's deployed runtime read-only).
+
+**The RPC endpoint is not a tool parameter.** It comes from `PSV_RPC_URL`,
+because which chain a verdict is proven against is a property of the deployment
+rather than a per-call choice: an agent naming its own node could be pointed at
+one that lies, and a verdict is worth exactly what the chain it was read from is
+worth. `PSV_RPC_TIMEOUT` and `PSV_MCP_TRANSPORT` are available for the same
+reason — operator settings, not arguments.
+
+Nothing in this surface writes. An RPC failure returns an error, never a verdict.
+
 ## Safety
 
 No mainnet money, ever. Reconciliation and drift checks are read-only. The only
