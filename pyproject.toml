@@ -36,8 +36,8 @@ core = []
 chain = ["web3>=7.0", "eth-account>=0.13"]
 # Run the bundled reference system-under-test.
 sut = [
-    "fastapi>=0.110",
-    "uvicorn>=0.29",
+    "fastapi>=0.141.1",
+    "uvicorn>=0.52.1",
     "httpx>=0.27",
     # The reference server recovers the configured facilitator account.
     "eth-account>=0.13",
@@ -45,9 +45,9 @@ sut = [
 release = [
     "build>=1.2",
     "hatchling>=1.27",
-    "twine>=5.1",
+    "twine>=7.0.0",
     "pip-audit>=2.7",
-    "uv>=0.5",
+    "uv>=0.12.1",
 ]
 # `mcp` sits here as well as in its own extra, deliberately: without it installed,
 # mypy resolves the server module's imports to Any and reports its tool decorator
@@ -58,19 +58,19 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "mypy>=1.10",
-    "ruff>=0.6",
-    "hypothesis>=6.156.7",
+    "ruff>=0.16.1",
+    "hypothesis>=6.164.0",
     "jsonschema>=4.23",
     "httpx>=0.27",
     "web3>=7.0",
     "eth-account>=0.13",
-    "fastapi>=0.110",
-    "uvicorn>=0.29",
+    "fastapi>=0.141.1",
+    "uvicorn>=0.52.1",
     "build>=1.2",
     "hatchling>=1.27",
-    "twine>=5.1",
+    "twine>=7.0.0",
     "pip-audit>=2.7",
-    "uv>=0.5",
+    "uv>=0.12.1",
 ]
 
 [tool.hatch.build.targets.wheel]
