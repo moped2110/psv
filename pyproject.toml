@@ -49,7 +49,12 @@ release = [
     "pip-audit>=2.7",
     "uv>=0.5",
 ]
+# `mcp` sits here as well as in its own extra, deliberately: without it installed,
+# mypy resolves the server module's imports to Any and reports its tool decorator
+# as untyped — three failures that say nothing about the code. A gate that shows
+# false red is a gate people stop reading, and ci.in already installs it.
 dev = [
+    "mcp>=2.0",
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "mypy>=1.10",
