@@ -7,6 +7,14 @@ All notable changes to psv are documented here. The format loosely follows
 
 ### Added
 
+- **MCP server (`psv-mcp`, optional `[mcp]` extra).** Exposes the read-only surface —
+  `list_rails`, `reconcile_settlement`, `rail_drift` — over the Model Context Protocol, so an
+  agent debugging a settlement divergence can ask for the proof from inside an editor instead of
+  assembling a long command line. The RPC endpoint comes from `PSV_RPC_URL` and is deliberately
+  **not** a tool parameter: which chain a verdict is proven against is a property of the
+  deployment, and an agent naming its own node could be pointed at one that lies. An RPC failure
+  returns an error, never a verdict.
+
 - Versioned, runtime-attested USDC/Base and EURC/Base rails with a read-only
   `rail-drift` command and scheduled drift observation. Uncalibrated public
   rails fail closed and signing remains disabled for every public rail.
