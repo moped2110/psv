@@ -121,3 +121,53 @@ def test_the_instructions_state_that_nothing_writes() -> None:
     """The client shows these to the model, which is where the posture belongs."""
     assert "nothing signs, sends or moves value" in mcp_server.INSTRUCTIONS
     assert "set by the operator" in mcp_server.INSTRUCTIONS
+
+
+# --- A hosted RPC URL is a credential ------------------------------------------
+#
+# Providers put the API key in the path (`/v2/<key>`, `/v3/<id>`). Interpolating
+# PSV_RPC_URL into an error message was fine while the only reader was the operator
+# at their own terminal. This surface changed the audience.
+
+HOSTED_RPC = "https://eth-mainnet.example/v2/sk_live_THIS_IS_THE_SECRET"
+
+
+def test_the_endpoint_is_redacted_to_scheme_and_host() -> None:
+    """The host is what a reader needs to know; the key is not."""
+    from psv.anvil import _redacted
+
+    assert _redacted(HOSTED_RPC) == "https://eth-mainnet.example"
+    assert "sk_live" not in _redacted(HOSTED_RPC)
+    # A value that is not a URL must not be echoed back either.
+    assert _redacted("sk_live_bare_secret") == "the configured RPC endpoint"
+
+
+def test_an_rpc_failure_never_hands_the_key_to_the_caller(monkeypatch) -> None:
+    """A node hiccup is routine; leaking the operator's provider key is not."""
+    monkeypatch.setenv("PSV_RPC_URL", HOSTED_RPC)
+
+    def boom(*args: Any, **kwargs: Any) -> Any:
+        """Fail the way a transport does, carrying the endpoint in the message."""
+        raise RuntimeError(f"transport failure contacting {HOSTED_RPC}: timed out")
+
+    monkeypatch.setattr("psv.cli.run_reconcile", boom)
+    result = call("reconcile_settlement", settlement_args())
+
+    assert "error" in result
+    assert "sk_live" not in str(result)
+    assert "timed out" not in str(result)
+
+
+def test_a_drift_failure_is_equally_quiet(monkeypatch) -> None:
+    """The second RPC-touching tool needs the same boundary, not just the first."""
+    monkeypatch.setenv("PSV_RPC_URL", HOSTED_RPC)
+
+    def boom(*args: Any, **kwargs: Any) -> Any:
+        """Fail with the endpoint in the message."""
+        raise RuntimeError(f"cannot reach {HOSTED_RPC}")
+
+    monkeypatch.setattr("psv.rails.check_rail_drift", boom)
+    result = call("rail_drift", {"rail": "mock-anvil"})
+
+    assert "error" in result
+    assert "sk_live" not in str(result)

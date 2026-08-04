@@ -16,6 +16,7 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 Transport = Callable[[dict[str, Any]], object]
 
@@ -182,6 +183,20 @@ def _validate_receipt(value: object, what: str) -> dict[str, Any]:
     return dict(value)
 
 
+def _redacted(endpoint: str) -> str:
+    """Render an RPC endpoint as scheme://host, dropping the path.
+
+    Hosted providers put the API key in the path (`/v2/<key>`, `/v3/<id>`), so an
+    endpoint interpolated into an error message carries a credential into every log
+    line and into every caller that sees the message — including, since the MCP
+    server exists, an agent. The host is what a reader needs; the key is not.
+    """
+    parsed = urlsplit(endpoint)
+    if not parsed.scheme or not parsed.netloc:
+        return "the configured RPC endpoint"
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def _urllib_transport(endpoint: str, timeout: float) -> Transport:
     """Create a bounded HTTP transport for one JSON-RPC endpoint."""
 
@@ -200,9 +215,9 @@ def _urllib_transport(endpoint: str, timeout: float) -> Transport:
             with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
                 raw = resp.read(_MAX_RPC_RESPONSE_BYTES + 1)
         except (urllib.error.URLError, OSError, TimeoutError) as exc:
-            raise RpcError(f"transport failure contacting {endpoint}: {exc}") from exc
+            raise RpcError(f"transport failure contacting {_redacted(endpoint)}: {exc}") from exc
         if len(raw) > _MAX_RPC_RESPONSE_BYTES:
-            raise RpcError(f"response from {endpoint} exceeds size limit")
+            raise RpcError(f"response from {_redacted(endpoint)} exceeds size limit")
         try:
             return json.loads(
                 raw.decode("utf-8"),
@@ -210,7 +225,9 @@ def _urllib_transport(endpoint: str, timeout: float) -> Transport:
                 object_pairs_hook=_reject_duplicate_keys,
             )
         except (UnicodeError, ValueError) as exc:
-            raise RpcError(f"malformed (non-JSON) response from {endpoint}: {exc}") from exc
+            raise RpcError(
+                f"malformed (non-JSON) response from {_redacted(endpoint)}: {exc}"
+            ) from exc
 
     return send
 

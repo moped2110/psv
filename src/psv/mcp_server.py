@@ -26,10 +26,13 @@ than believe it.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Any
 
 TRANSPORTS = ("stdio", "sse", "streamable-http")
+
+log = logging.getLogger("psv.mcp")
 DEFAULT_RPC_TIMEOUT = 10.0
 
 INSTRUCTIONS = """\
@@ -165,9 +168,12 @@ def build_server() -> Any:
                 sut_believes_paid=sut_believes_paid,
             )
         except Exception as exc:
-            # Fail closed and name the problem. A verification tool that turned an
-            # RPC hiccup into a verdict would be worse than one that said nothing.
-            return {"error": f"reconciliation could not be completed: {exc}"}
+            # Fail closed and say so — a verification tool that turned an RPC hiccup
+            # into a verdict would be worse than one that said nothing. But the
+            # exception text is not the caller's: it carries PSV_RPC_URL, and hosted
+            # providers put the API key in that path. The detail goes to the log.
+            log.warning("reconcile_settlement failed on rail %r: %s", rail, exc)
+            return {"error": "reconciliation could not be completed"}
         return _report_dict(report)
 
     @server.tool(
@@ -194,7 +200,8 @@ def build_server() -> Any:
         try:
             check = check_rail_drift(rail_config, client)
         except Exception as exc:
-            return {"error": f"drift observation could not be completed: {exc}"}
+            log.warning("rail_drift failed on rail %r: %s", rail, exc)
+            return {"error": "drift observation could not be completed"}
         # `matches` lifted to the top level: it is the answer, and burying it
         # inside the detail would make a caller hunt for the verdict.
         return {"matches": check.matches, **_as_dict(check)}
