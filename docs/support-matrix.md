@@ -23,6 +23,31 @@ and proxy identities. It never signs or submits a transaction, and it is intenti
 separate from pull-request gates. JPYC/Polygon remains registered but uncalibrated and
 fails closed.
 
+## Interfaces (what can drive a verification)
+
+Three interfaces reach the same verification core, and none of them widens what it
+can do — psv never originates a transaction, so there is no signing path any of them
+could reach.
+
+- **CLI (`psv`)** — the full surface. Stdlib only; extras are opt-in per capability.
+- **Library** — `psv` is imported as a dependency by the hosted lab and by `rvf`. The
+  importing project owns its own guard rails; psv contributes read-only logic.
+- **MCP server (`psv-mcp`, `[mcp]` extra)** — `list_rails`, `reconcile_settlement` and
+  `rail_drift` for agent callers. Read-only like everything else here.
+
+Two properties of the MCP surface are deliberate and worth stating, because they are
+the ones a reader would otherwise have to infer from code:
+
+**The RPC endpoint is not a tool parameter.** It comes from `PSV_RPC_URL`, set by the
+operator. Which chain a verdict was proven against is a property of the deployment, not
+a per-call choice: an endpoint named by the caller could be a node that lies, and the
+tool would also become a general-purpose request primitive aimed at whatever host
+appeared in a prompt.
+
+**The endpoint never travels back to the caller.** A hosted provider puts its API key in
+the URL path, so RPC errors render the endpoint as scheme and host only, and the MCP
+boundary returns a verdict while the detail goes to the operator's log.
+
 ## What a green run does not certify
 
 - Production readiness, mainnet safety, legal or regulatory compliance.
