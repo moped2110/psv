@@ -1,8 +1,13 @@
 name: CI
 
 on:
+  # Every branch, not just main. Branch work used to reach main without ever having
+  # been tested: on 2026-08-04 an MCP server sat on a branch for days with no run at
+  # all, and its first CI run — only triggered because a PR was opened by hand —
+  # failed on two transitively vulnerable dependencies. Unopened, that would have
+  # landed as a red main. The repo is public, so branch runs cost nothing; the cost
+  # of not running them is finding out after the merge. Mirrors x402-conformance.
   push:
-    branches: [main]
   pull_request:
   schedule:
     - cron: "23 4 * * 1"

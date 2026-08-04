@@ -41,3 +41,8 @@ anvil-state.json
 psv-runs/
 .smoke/
 wheelhouse/
+
+# This project locks through requirements/ci.in -> requirements/ci.txt. A bare
+# `uv run` in the repo root creates a uv.lock as a side effect, and committing it
+# would leave two competing lock mechanisms where the drift guard only watches one.
+uv.lock
