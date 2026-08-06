@@ -197,8 +197,42 @@ def _redacted(endpoint: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
+class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
+    """Refuse every redirect on the chain-truth transport.
+
+    A psv verdict is worth exactly as much as the chain it was read from, and a
+    redirect moves that read to a host the operator did not configure — enough to
+    substitute the oracle and turn a real divergence into "consistent", or the
+    reverse. urllib's default handler would also follow https to http.
+
+    A JSON-RPC endpoint has no legitimate reason to redirect, so this refuses
+    rather than allowlists. x402-conformance states the same rule in its SECURITY.md
+    and enforces it with `follow_redirects=False`; psv inherited the concern and not
+    the countermeasure.
+    """
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> None:
+        """Refuse the redirect. Signature is urllib's; the return type never happens."""
+        raise RpcError(
+            f"RPC endpoint {_redacted(req.full_url)} answered {code} with a redirect; "
+            "refusing to follow it — chain truth must come from the configured host"
+        )
+
+
 def _urllib_transport(endpoint: str, timeout: float) -> Transport:
     """Create a bounded HTTP transport for one JSON-RPC endpoint."""
+
+    # Built once per transport: an opener that refuses redirects instead of the
+    # module-level urlopen, which quietly follows them.
+    opener = urllib.request.build_opener(_RefuseRedirects)
 
     def send(request: dict[str, Any]) -> object:
         """POST one request and strictly decode its bounded JSON response."""
@@ -212,7 +246,7 @@ def _urllib_transport(endpoint: str, timeout: float) -> Transport:
             },
         )
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            with opener.open(req, timeout=timeout) as resp:  # noqa: S310
                 raw = resp.read(_MAX_RPC_RESPONSE_BYTES + 1)
         except (urllib.error.URLError, OSError, TimeoutError) as exc:
             raise RpcError(f"transport failure contacting {_redacted(endpoint)}: {exc}") from exc

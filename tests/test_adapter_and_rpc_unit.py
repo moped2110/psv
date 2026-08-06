@@ -119,3 +119,57 @@ def test_rpc_raises_on_error_response() -> None:
         assert "eth_chainId" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("expected RpcError")
+
+
+# --- The chain-truth transport refuses redirects -------------------------------
+#
+# A verdict is worth exactly as much as the chain it was read from. urllib follows
+# redirects by default, which would let a redirecting or hijacked provider move the
+# read to a host the operator never configured — and would also permit https -> http.
+# x402-conformance states this rule in its SECURITY.md; psv had inherited the concern
+# without the countermeasure.
+
+
+def test_a_redirecting_rpc_endpoint_is_refused_not_followed() -> None:
+    """The handler raises instead of handing urllib a new request to issue."""
+    import urllib.request
+
+    from psv.anvil import _RefuseRedirects
+
+    handler = _RefuseRedirects()
+    request = urllib.request.Request("https://rpc.example/v2/sk_live_SECRET")
+
+    try:
+        handler.redirect_request(request, None, 302, "Found", {}, "https://elsewhere.example/")
+    except RpcError as exc:
+        message = str(exc)
+    else:  # pragma: no cover - the point of the test
+        raise AssertionError("a redirect was accepted")
+
+    assert "refusing to follow" in message
+    # The refusal names the host so an operator can act on it, but not the key.
+    assert "rpc.example" in message
+    assert "sk_live" not in message
+
+
+def test_the_transport_is_built_with_the_refusing_handler() -> None:
+    """The rule has to be wired in, not merely available."""
+    import urllib.request
+
+    from psv.anvil import _RefuseRedirects, _urllib_transport
+
+    built: list[Any] = []
+    real_build_opener = urllib.request.build_opener
+
+    def spy(*handlers: Any) -> Any:
+        """Record which handlers the transport asks for."""
+        built.extend(handlers)
+        return real_build_opener(*handlers)
+
+    urllib.request.build_opener = spy  # type: ignore[assignment]
+    try:
+        _urllib_transport("https://rpc.example", timeout=1.0)
+    finally:
+        urllib.request.build_opener = real_build_opener  # type: ignore[assignment]
+
+    assert _RefuseRedirects in built

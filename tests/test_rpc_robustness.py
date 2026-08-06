@@ -32,18 +32,40 @@ class _FakeResp:
         return self._body
 
 
-def test_transport_wraps_network_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    def boom(*_a: object, **_k: object) -> object:
-        raise urllib.error.URLError("connection refused")
+class _FakeOpener:
+    """Stands in for the opener the transport builds, so no request leaves the box.
 
-    monkeypatch.setattr(urllib.request, "urlopen", boom)
+    The transport stopped calling urllib.request.urlopen when it started refusing
+    redirects — it builds its own opener now. Patching urlopen would silently test
+    nothing while making a real connection attempt, which is what happened here.
+    """
+
+    def __init__(self, behaviour: object) -> None:
+        self._behaviour = behaviour
+
+    def open(self, *_a: object, **_k: object) -> object:
+        """Return the canned response, or raise the canned failure."""
+        behaviour = self._behaviour
+        if isinstance(behaviour, BaseException):
+            raise behaviour
+        return behaviour
+
+
+def test_transport_wraps_network_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        urllib.request,
+        "build_opener",
+        lambda *_h: _FakeOpener(urllib.error.URLError("connection refused")),
+    )
     send = _urllib_transport("http://127.0.0.1:1", 0.5)
     with pytest.raises(RpcError, match="transport failure"):
         send(_REQ)
 
 
 def test_transport_wraps_non_json_response(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(urllib.request, "urlopen", lambda *_a, **_k: _FakeResp(b"<<garbage>>"))
+    monkeypatch.setattr(
+        urllib.request, "build_opener", lambda *_h: _FakeOpener(_FakeResp(b"<<garbage>>"))
+    )
     send = _urllib_transport("http://x", 0.5)
     with pytest.raises(RpcError, match="non-JSON"):
         send(_REQ)
