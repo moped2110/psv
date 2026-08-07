@@ -7,6 +7,27 @@ All notable changes to psv are documented here. The format loosely follows
 
 ### Added
 
+- **Rails for the networks x402 added default stablecoins to (x402#3025, #3031):**
+  `usdc-celo` (42220), `usdc-celo-sepolia` (11142220) and `usdt0-flare` (14).
+  All three are **uncalibrated**, so live reconciliation fails closed until a
+  reviewed block, runtime-code hash and proxy implementation are captured from
+  the chain independently — the same posture as `jpyc-polygon`. Recording them
+  now is the difference between an endpoint quoting a *known-but-uncalibrated*
+  rail and an *unknown* one: the first refuses with a reason, the second just
+  refuses.
+
+### Documented
+
+- **SC1 is confirmed by upstream, from the other direction.** In August 2026 the
+  x402 SDKs stopped treating `receipt.status` as proof of transfer in all three
+  languages (x402#2385 TS, #2727 Go, #3032 Python), adding
+  `invalid_exact_evm_transfer_event_mismatch` for a transaction that succeeded
+  but emitted no matching `Transfer`. Upstream's bug was trusting the receipt and
+  never checking the event; SC1 is trusting the event and having it change
+  underneath. Both reduce to one signal being treated as proof of settlement when
+  that signal can be true while the payment is not. `docs/sc1-abi-drift.md`
+  records the connection.
+
 - **MCP server (`psv-mcp`, optional `[mcp]` extra).** Exposes the read-only surface —
   `list_rails`, `reconcile_settlement`, `rail_drift` — over the Model Context Protocol, so an
   agent debugging a settlement divergence can ask for the proof from inside an editor instead of

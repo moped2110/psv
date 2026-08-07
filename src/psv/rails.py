@@ -161,6 +161,10 @@ _CIRCLE_EURC = "https://developers.circle.com/stablecoins/eurc-contract-addresse
 _JPYC_NOTICE = "https://corporate.jpyc.co.jp/news/posts/Notice"
 _EIP_3009 = "https://eips.ethereum.org/EIPS/eip-3009"
 _BASE_RPC = "https://mainnet.base.org"
+# Upstream's own default-asset table. It is the authority for which token an x402
+# endpoint on these chains will actually quote, which is exactly what a rail needs
+# to identify. It is not a substitute for the on-chain calibration below.
+_X402_DEFAULT_ASSETS = "https://github.com/x402-foundation/x402/blob/main/DEFAULT_ASSETS.md"
 
 
 def _attestation(
@@ -287,6 +291,68 @@ KNOWN_RAILS: dict[str, RailConfig] = {
             implementation_address="0x2ce6311ddae708829bc0784c967b7d77d19fd779",
             proxy_implementation_slot="0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3",
             implementation_code_sha256="dcb3b7ca28662970d0a7cdad420e529fb837d7bf8a246b1a680c20e153db79e8",
+        ),
+    ),
+    # --- Added by x402#3025 / #3031 (upstream default assets, 2026-08) -------------
+    #
+    # Uncalibrated on purpose. A rail is only usable for live reconciliation once a
+    # reviewed block, runtime-code hash and proxy implementation have been captured
+    # from the chain independently; `calibrated=False` makes these fail closed until
+    # then, exactly like jpyc-polygon. Recording them now means an endpoint quoting
+    # these chains is a known-but-uncalibrated rail rather than an unknown one — the
+    # difference between "we refuse, and here is why" and "we have never heard of it".
+    "usdc-celo": RailConfig(
+        "usdc-celo",
+        "USDC on Celo",
+        42220,
+        "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
+        6,
+        "USDC",
+        "2",
+        FinalityPolicy("finalized", 1),
+        _attestation(
+            sources=(_CIRCLE_USDC, _EIP_3009, _X402_DEFAULT_ASSETS),
+            network_class="mainnet",
+            proxy_kind="unknown",
+            decimals=6,
+            domain_name="USDC",
+            domain_version="2",
+        ),
+    ),
+    "usdc-celo-sepolia": RailConfig(
+        "usdc-celo-sepolia",
+        "USDC on Celo Sepolia",
+        11142220,
+        "0x01C5C0122039549AD1493B8220cABEdD739BC44E",
+        6,
+        "USDC",
+        "2",
+        FinalityPolicy("finalized", 1),
+        _attestation(
+            sources=(_CIRCLE_USDC, _EIP_3009, _X402_DEFAULT_ASSETS),
+            network_class="testnet",
+            proxy_kind="unknown",
+            decimals=6,
+            domain_name="USDC",
+            domain_version="2",
+        ),
+    ),
+    "usdt0-flare": RailConfig(
+        "usdt0-flare",
+        "USD\u20ae0 on Flare",
+        14,
+        "0xe7cd86e13AC4309349F30B3435a9d337750fC82D",
+        6,
+        "USD\u20ae0",
+        "1",
+        FinalityPolicy("finalized", 1),
+        _attestation(
+            sources=(_EIP_3009, _X402_DEFAULT_ASSETS),
+            network_class="mainnet",
+            proxy_kind="unknown",
+            decimals=6,
+            domain_name="USD\u20ae0",
+            domain_version="1",
         ),
     ),
 }
