@@ -5,7 +5,32 @@ All notable changes to psv are documented here. The format loosely follows
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-06
+
 ### Added
+
+- **Reorg-aware finality for the reference confirmer (PSV-RD-001).** Finality was measured by depth
+  alone, so a settlement with enough confirmations on a fork that was later reorganised away still
+  counted as final — a phantom credit, with the EIP-3009 nonce free again. `assess_finality` now
+  requires the block to be both deep enough **and** still the canonical one at its height (canonical
+  hash equals mining hash). Reorganised away, canonical hash unavailable, unmined or too shallow all
+  return `final=False` with a reason. Pure offline decision logic.
+- **Asset-scoped reconciliation defeats the multi-asset race (PSV-RD-003).** `find_unreconciled`
+  failed closed on logs of a foreign asset, so it could not process a realistic mixed block at all.
+  `reconcile_asset_scoped` narrows the snapshot to the expected asset first: a same-block transfer of
+  a *different* asset to the same payee is excluded rather than misattributed to this order.
+  Cross-recipient transfers within the scoped asset and removed/reorged logs still fail closed.
+- **Independent SVM settlement oracle and rail (PSV-RD-004).** `settlement_truth_from_svm_meta`
+  reads Solana's `getTransaction` metadata — `err` plus pre/post token balances — without asking the
+  system under test anything, and builds the same `SettlementTruth` the EVM path produces. The
+  chain-agnostic detectors therefore grade SVM unchanged, for `exact` and `upto` alike. SVM has no
+  EIP-3009 nonce, so `err is None` feeds `nonce_consumed`. `RailConfig` is EVM-shaped, so SVM gets a
+  parallel read-only `SvmRailConfig`.
+- **Over-authorized `upto` (metered) settlements are a divergence (PSV-RD-006).** Under `upto`,
+  settling *less* than the authorised maximum is healthy — that is what metering means — and settling
+  *more* is the bug. `detect_metered_divergence` mirrors the exact-scheme detector with that sign
+  reversed and adds `OVER_AUTHORIZED_SETTLEMENT` as a critical kind. Replay of a spent authorisation
+  needs no new kind: it moves nothing on chain and lands as a phantom credit.
 
 - **MCP server (`psv-mcp`, optional `[mcp]` extra).** Exposes the read-only surface —
   `list_rails`, `reconcile_settlement`, `rail_drift` — over the Model Context Protocol, so an
@@ -42,6 +67,11 @@ All notable changes to psv are documented here. The format loosely follows
 
 ### Changed
 
+- **CI runs on every branch, not only `main`.** An MCP server sat on a branch for days with no run at
+  all; its first run — triggered only because a pull request was opened by hand during a review —
+  failed on two transitively vulnerable dependencies. Unopened, that would have arrived as a red
+  `main`. x402-conformance made the same change in July after being burned the same way, by
+  dependency locks specifically; the lesson had not travelled.
 - `psv reconcile` now requires `--tx-hash`, `--log-index`, and positive
   `--required-amount`. Aggregate balance deltas alone are no longer accepted as
   proof of one settlement.
@@ -66,6 +96,23 @@ All notable changes to psv are documented here. The format loosely follows
   collisions cannot be silently accepted.
 - The calibration token rejects zero endpoints, zero recovered signers, invalid
   `v`, and high-`s` signatures.
+
+### Security
+
+- **The chain-truth transport refuses redirects.** A verdict is worth exactly as much as the chain it
+  was read from, and urllib follows redirects by default. A redirecting or hijacked provider could
+  move the read to a host the operator never configured — enough to substitute the oracle and turn a
+  real divergence into "consistent", or the reverse — and urllib would permit an https to http
+  downgrade on the way. A JSON-RPC endpoint has no legitimate reason to redirect, so this refuses
+  rather than allowlists. x402-conformance states the same rule in its security policy; psv had
+  inherited the concern and not the countermeasure.
+- **The RPC endpoint no longer travels back to the caller.** Hosted providers put the API key in the
+  URL path, so an endpoint interpolated into an error message carried a credential into every log
+  line — and, once the MCP server existed, into an agent's context. Errors now render the endpoint as
+  scheme and host only, and the MCP boundary returns a verdict while the detail goes to the log.
+- **Security floors on two transitive dependencies.** `cryptography` arrives via the new `mcp` extra
+  and `aiohttp` via `web3`; both sat at versions with published advisories (PYSEC-2026-3552,
+  PYSEC-2026-3545/3546/3547), which `pip-audit --strict` fails the supply-chain job for.
 
 ## [0.1.0] - 2026-07-09
 
