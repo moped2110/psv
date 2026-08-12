@@ -162,6 +162,12 @@ construction/signing and permits only local Anvil or explicitly reviewed testnet
 chains. Tests use Anvil's public development keys and local test funds. psv is a
 verification tool, not custody, a payment service, or legal/financial advice.
 
+## Contributing
+
+Gates, dependency-lock rules, and the boundary of what this project accepts are in
+[`CONTRIBUTING.md`](CONTRIBUTING.md). Vulnerabilities go to [`SECURITY.md`](SECURITY.md),
+not to a public issue.
+
 ## License
 
 Apache-2.0.
