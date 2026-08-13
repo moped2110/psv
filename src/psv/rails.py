@@ -156,11 +156,21 @@ class RailConfig:
 
 
 _REVIEWED = date(2026, 7, 18)
+# Rails are reviewed when they are captured, not all at once. Sharing one date across
+# rails would make a rail read today attest to a review that happened weeks earlier —
+# the exact class of unverified claim this module exists to reject.
+_REVIEWED_POLYGON = date(2026, 8, 13)
+_ATTESTATION_VERSION = "2026-07-18.2"
+_ATTESTATION_VERSION_POLYGON = "2026-08-13.1"
 _CIRCLE_USDC = "https://developers.circle.com/stablecoins/usdc-contract-addresses"
 _CIRCLE_EURC = "https://developers.circle.com/stablecoins/eurc-contract-addresses"
 _JPYC_NOTICE = "https://corporate.jpyc.co.jp/news/posts/Notice"
 _EIP_3009 = "https://eips.ethereum.org/EIPS/eip-3009"
 _BASE_RPC = "https://mainnet.base.org"
+# The endpoint the Polygon attestation was actually captured from. It is provenance,
+# not a requirement: any node reporting chain 137 can verify these values, and
+# rail-drift re-reads them on every run.
+_POLYGON_RPC = "https://polygon.drpc.org"
 
 
 def _attestation(
@@ -178,11 +188,13 @@ def _attestation(
     implementation_address: str | None = None,
     proxy_implementation_slot: str | None = None,
     implementation_code_sha256: str | None = None,
+    reviewed_on: date = _REVIEWED,
+    version: str = _ATTESTATION_VERSION,
 ) -> RailAttestation:
     """Construct a versioned rail attestation from reviewed metadata."""
     return RailAttestation(
-        version="2026-07-18.2",
-        reviewed_on=_REVIEWED,
+        version=version,
+        reviewed_on=reviewed_on,
         authoritative_sources=sources,
         interface="eip3009",
         network_class=network_class,
@@ -244,6 +256,40 @@ KNOWN_RAILS: dict[str, RailConfig] = {
             implementation_address="0x2ce6311ddae708829bc0784c967b7d77d19fd779",
             proxy_implementation_slot="0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3",
             implementation_code_sha256="dcb3b7ca28662970d0a7cdad420e529fb837d7bf8a246b1a680c20e153db79e8",
+        ),
+    ),
+    "usdc-polygon": RailConfig(
+        "usdc-polygon",
+        "USDC on Polygon",
+        137,
+        "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+        6,
+        "USD Coin",
+        "2",
+        FinalityPolicy("finalized", 1),
+        _attestation(
+            sources=(_CIRCLE_USDC, _EIP_3009, _POLYGON_RPC),
+            network_class="mainnet",
+            proxy_kind="fiat-token-proxy",
+            decimals=6,
+            # Solved from the contract's own DOMAIN_SEPARATOR() rather than copied
+            # from name()/version(); see tools/capture_rail_attestation.py. Here the
+            # two agree, which is a finding, not an assumption.
+            domain_name="USD Coin",
+            domain_version="2",
+            calibrated=True,
+            reviewed_block_number=91_954_134,
+            reviewed_block_hash="0x643d0996cf9b2c8a345330946878e5f701a4bfbb825dab4b5b4337432012ce2c",
+            expected_code_sha256="dc2898fcd8071dd801212e8f34ce32f23aba05aadbad71ff84ef7faa2909a29c",
+            implementation_address="0x235ae97b28466db30469b89a9fe4cff0659f82cb",
+            proxy_implementation_slot=(
+                "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3"
+            ),
+            implementation_code_sha256=(
+                "ccc73d219a0d3f7ea8a2bafce3351a9ae1d394dd9ab4c35497865541505fedd9"
+            ),
+            reviewed_on=_REVIEWED_POLYGON,
+            version=_ATTESTATION_VERSION_POLYGON,
         ),
     ),
     "jpyc-polygon": RailConfig(

@@ -45,10 +45,19 @@ def _reconcile(**overrides: object):  # type: ignore[no-untyped-def]
 
 
 def test_known_rails_have_reviewed_runtime_metadata() -> None:
-    assert set(KNOWN_RAILS) >= {"mock-anvil", "usdc-base", "jpyc-polygon", "eurc-base"}
+    assert set(KNOWN_RAILS) >= {
+        "mock-anvil",
+        "usdc-base",
+        "usdc-polygon",
+        "jpyc-polygon",
+        "eurc-base",
+    }
     for rail in KNOWN_RAILS.values():
         assert rail.attestation.authoritative_sources
-        assert rail.attestation.reviewed_on.isoformat() == "2026-07-18"
+        # Rails are reviewed when they are captured, so the date is per rail. What must
+        # hold for all of them is that the version string carries its own review date —
+        # otherwise two attestations captured months apart become indistinguishable.
+        assert rail.attestation.version.startswith(rail.attestation.reviewed_on.isoformat())
         assert rail.attestation.interface == "eip3009"
         assert rail.attestation.expected_decimals == rail.decimals
         assert rail.signing_enabled is False
@@ -56,6 +65,7 @@ def test_known_rails_have_reviewed_runtime_metadata() -> None:
     assert get_rail("mock-anvil").attestation.calibrated is True
     assert get_rail("usdc-base").attestation.calibrated is True
     assert get_rail("eurc-base").attestation.calibrated is True
+    assert get_rail("usdc-polygon").attestation.calibrated is True
     assert get_rail("jpyc-polygon").attestation.calibrated is False
 
 
@@ -70,6 +80,48 @@ def test_eurc_is_the_reviewed_read_only_eur_rail() -> None:
         "c9cf7c3f11c4d3d818801b5a965cea3bae6ff3b9b923242b91a9b4e5888e7835"
     )
     assert eurc.attestation.implementation_address == ("0x2ce6311ddae708829bc0784c967b7d77d19fd779")
+
+
+def test_usdc_polygon_is_a_calibrated_read_only_rail() -> None:
+    """Polygon USDC pins the identity that makes a drift check meaningful."""
+    rail = get_rail("usdc-polygon")
+    assert rail.chain_id == 137
+    assert rail.token_address == "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
+    assert rail.decimals == 6
+    # The EIP-712 domain was solved from the contract's DOMAIN_SEPARATOR(), and the
+    # RailConfig invariant requires it to equal the attested domain. Pinning it here
+    # means a later "tidy-up" that copies name() into the domain fails loudly.
+    assert rail.token_name == "USD Coin" and rail.token_version == "2"
+    assert rail.attestation.domain_name == "USD Coin"
+    assert rail.attestation.domain_version == "2"
+    assert rail.finality.block_tag == "finalized"
+    assert rail.attestation.reviewed_block_number == 91_954_134
+    assert rail.attestation.reviewed_block_hash == (
+        "0x643d0996cf9b2c8a345330946878e5f701a4bfbb825dab4b5b4337432012ce2c"
+    )
+    assert rail.attestation.expected_code_sha256 == (
+        "dc2898fcd8071dd801212e8f34ce32f23aba05aadbad71ff84ef7faa2909a29c"
+    )
+    assert rail.attestation.implementation_address == "0x235ae97b28466db30469b89a9fe4cff0659f82cb"
+    assert rail.attestation.implementation_code_sha256 == (
+        "ccc73d219a0d3f7ea8a2bafce3351a9ae1d394dd9ab4c35497865541505fedd9"
+    )
+    # A calibrated mainnet rail is still read-only. This is the invariant SECURITY.md
+    # promises, asserted on the rail most likely to tempt someone into signing.
+    assert rail.signing_enabled is False
+
+
+def test_polygon_usdc_and_base_usdc_do_not_share_a_domain() -> None:
+    """Two USDC deployments must not be interchangeable for signature purposes."""
+    polygon = get_rail("usdc-polygon")
+    base = get_rail("usdc-base")
+    assert polygon.token_name == base.token_name
+    assert polygon.token_version == base.token_version
+    # Same name and version, different chain and contract: the EIP-712 domain differs
+    # only through chainId and verifyingContract. A reconciliation that ignored either
+    # would accept a Base authorization as proof of a Polygon settlement.
+    assert polygon.chain_id != base.chain_id
+    assert polygon.token_address.lower() != base.token_address.lower()
 
 
 def test_unknown_rail_raises() -> None:

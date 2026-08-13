@@ -5,6 +5,33 @@ All notable changes to psv are documented here. The format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **USDC on Polygon is a calibrated read-only rail (PSV-RAIL-USDC-POLYGON).** `rails.py` is a
+  registry, so one more calibrated rail is one more chain a settlement can be verified against —
+  and Polygon settles in USDC, not in the rail that was already registered there. Pinned from a
+  single finalized block: runtime-code hash, proxy implementation slot, implementation address and
+  its code hash. Signing stays disabled, as it is for every reconciliation rail.
+- **`tools/capture_rail_attestation.py` — the read that makes calibration reviewable.** A
+  calibrated rail claims "this is the contract we reviewed"; typing those values out of a block
+  explorer makes that claim unverifiable. The tool performs the read (`eth_chainId`,
+  `eth_getBlockByNumber`, `eth_getCode`, `eth_getStorageAt`, `eth_call` — nothing else) through
+  psv's own hardened RPC client, so the capture inherits redirect refusal, bounded responses and
+  endpoint redaction.
+  Its point of view is that the **EIP-712 domain is solved, not assumed**: `FiatTokenV2_2` does not
+  necessarily derive its domain separator from the current `name()`, so the tool reads
+  `DOMAIN_SEPARATOR()` and reports which candidate name/version actually reproduces it. Copying
+  `name()` into `domain_name` would attest to a domain the contract never uses — and no test would
+  catch it, because every test would share the assumption. For Polygon USDC the two agree; that is
+  a finding, not a premise.
+
+### Changed
+
+- **Rail attestations carry their own review date.** `_attestation()` hard-coded one date for every
+  rail, so a rail captured today would have attested to a review that happened weeks earlier. The
+  date and version are now per rail, and a test requires the version string to begin with the
+  review date so two captures months apart stay distinguishable.
+
 ## [0.2.0] — 2026-08-06
 
 ### Added
