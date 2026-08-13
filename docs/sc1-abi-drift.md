@@ -55,6 +55,34 @@ is malformed. Only an oracle that reads the chain *independently of the event th
 system trusts* can see that a settlement really happened. That independence is
 the harness's reason to exist.
 
+## Upstream confirmed the class (x402#2385 / #2727 / #3032, 2026-08)
+
+SC1 is not a scenario invented for this harness. In August 2026 the x402 SDKs
+fixed the same reasoning error in all three languages — TypeScript
+([#2385](https://github.com/x402-foundation/x402/pull/2385)), Go
+([#2727](https://github.com/x402-foundation/x402/pull/2727)) and Python
+([#3032](https://github.com/x402-foundation/x402/pull/3032)). From the TypeScript
+PR:
+
+> `settleEIP3009` currently treats `receipt.status === "success"` as proof of a
+> successful transfer. The receipt's status only tells us the tx did not revert;
+> it does not tell us that the expected ERC-20 `Transfer` was emitted from the
+> expected token contract with the expected `(from, to, value)`.
+
+The fix adds `ErrTransferEventMismatch`
+(`invalid_exact_evm_transfer_event_mismatch`) so a transaction that succeeded but
+emitted no matching `Transfer` is reported as a settlement *failure* rather than
+a success.
+
+That is the same premise SC1 attacks, approached from the other side. Upstream's
+bug was trusting the receipt and never checking the event; SC1 is trusting the
+event and having it change underneath. Both reduce to the same thing: **one
+signal is being treated as proof of settlement, and the signal can be true while
+the payment is not.** Upstream now checks receipt *and* event; SC1 shows that
+even the event alone is not enough once a token can change what it emits, which
+is why the defenses below ask for independent signals rather than a better single
+one.
+
 ## Defenses a real system should adopt (and `psv` can verify)
 
 - Confirm settlement on **multiple independent signals** (balance delta and/or

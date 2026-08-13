@@ -5,6 +5,8 @@ All notable changes to psv are documented here. The format loosely follows
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-13
+
 ### Added
 
 - **USDC on Polygon is a calibrated read-only rail (PSV-RAIL-USDC-POLYGON).** `rails.py` is a
@@ -30,7 +32,40 @@ All notable changes to psv are documented here. The format loosely follows
 - **Rail attestations carry their own review date.** `_attestation()` hard-coded one date for every
   rail, so a rail captured today would have attested to a review that happened weeks earlier. The
   date and version are now per rail, and a test requires the version string to begin with the
-  review date so two captures months apart stay distinguishable.
+  review date so two captures months apart stay distinguishable. The three rails below carry
+  2026-08-13 for the same reason: they were taken from upstream's table today, and inheriting
+  the July date would have been exactly the claim this change exists to prevent.
+
+- **Rails for the networks x402 added default stablecoins to (x402#3025, #3031):**
+  `usdc-celo` (42220), `usdc-celo-sepolia` (11142220) and `usdt0-flare` (14).
+  All three are **uncalibrated**, so live reconciliation fails closed until a
+  reviewed block, runtime-code hash and proxy implementation are captured from
+  the chain independently — the same posture as `jpyc-polygon`. Recording them
+  now is the difference between an endpoint quoting a *known-but-uncalibrated*
+  rail and an *unknown* one: the first refuses with a reason, the second just
+  refuses.
+
+### Documented
+
+- **SC1 is confirmed by upstream, from the other direction.** In August 2026 the
+  x402 SDKs stopped treating `receipt.status` as proof of transfer in all three
+  languages (x402#2385 TS, #2727 Go, #3032 Python), adding
+  `invalid_exact_evm_transfer_event_mismatch` for a transaction that succeeded
+  but emitted no matching `Transfer`. Upstream's bug was trusting the receipt and
+  never checking the event; SC1 is trusting the event and having it change
+  underneath. Both reduce to one signal being treated as proof of settlement when
+  that signal can be true while the payment is not. `docs/sc1-abi-drift.md`
+  records the connection.
+
+### Known gap
+
+- **The three new rails' EIP-712 domains are asserted, not solved.** `domain_name` and
+  `domain_version` for `usdc-celo`, `usdc-celo-sepolia` and `usdt0-flare` come from
+  upstream's default-asset table rather than from each contract's `DOMAIN_SEPARATOR()`.
+  EIP-712 hashes the domain string byte-exactly, so `USD₮0` is one character away from a
+  domain no signature will ever match. `calibrated=False` keeps the claim from being
+  load-bearing today; solve them with `tools/capture_rail_attestation.py` before any of
+  these is calibrated.
 
 ## [0.2.0] — 2026-08-06
 
