@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -157,6 +158,19 @@ def test_proxy_kind_domain_is_validated() -> None:
     # Every reviewed kind still constructs.
     for kind in ("none", "fiat-token-proxy", "vendor-proxy", "unknown"):
         replace(attestation, proxy_kind=kind, calibrated=False)
+
+
+def test_every_registered_rail_appears_in_the_rails_document() -> None:
+    """docs/rails.md is the registry a reader sees; it must list what ships.
+
+    It described four rails while the code registered eight — the four newest were
+    invisible to anyone reading the documentation instead of the source. Nothing
+    checked it, which is the whole explanation: the check counts in the sibling
+    project are pinned to code and stayed correct across the same period.
+    """
+    doc = (Path(__file__).resolve().parents[1] / "docs" / "rails.md").read_text(encoding="utf-8")
+    missing = sorted(key for key in KNOWN_RAILS if f"`{key}`" not in doc)
+    assert not missing, f"rails registered but absent from docs/rails.md: {missing}"
 
 
 def test_unknown_rail_raises() -> None:
