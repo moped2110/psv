@@ -27,6 +27,14 @@ _HASH_RE = re.compile(r"^0x[0-9a-fA-F]{64}$")
 _BYTES32_RE = _HASH_RE
 _UINT256_MAX = 2**256 - 1
 
+#: How a rail's token is deployed. This is not descriptive metadata: `"none"` makes
+#: `check_rail_drift` skip implementation verification entirely, and a proxy's runtime
+#: code hash does **not** change when its implementation is swapped. Declaring a proxy
+#: as `"none"` therefore blinds the drift check to the one change it exists to catch.
+#: Validating the domain does not prevent that choice being wrong — it prevents it
+#: being a typo, and forces a new value to be a reviewed addition rather than a string.
+_PROXY_KINDS = frozenset({"none", "fiat-token-proxy", "vendor-proxy", "erc1967-proxy", "unknown"})
+
 
 class ChainEvidenceError(RpcError):
     """Chain responses are valid individually but cannot prove one settlement."""
@@ -76,6 +84,11 @@ class RailAttestation:
             raise ValueError("only the attested eip3009 interface is supported")
         if self.network_class not in {"local", "testnet", "mainnet"}:
             raise ValueError("invalid network classification")
+        if self.proxy_kind not in _PROXY_KINDS:
+            raise ValueError(
+                f"unknown proxy_kind {self.proxy_kind!r}; "
+                f"reviewed kinds are {', '.join(sorted(_PROXY_KINDS))}"
+            )
         if not 0 <= self.expected_decimals <= 36:
             raise ValueError("attested decimals must be within [0, 36]")
         if (self.reviewed_block_number is None) != (self.reviewed_block_hash is None):
@@ -175,6 +188,15 @@ _POLYGON_RPC = "https://polygon.drpc.org"
 # endpoint on these chains will actually quote, which is exactly what a rail needs
 # to identify. It is not a substitute for the on-chain calibration below.
 _X402_DEFAULT_ASSETS = "https://github.com/x402-foundation/x402/blob/main/DEFAULT_ASSETS.md"
+_CELO_RPC = "https://forno.celo.org"
+_CELO_SEPOLIA_RPC = "https://forno.celo-sepolia.celo-testnet.org"
+_FLARE_RPC = "https://flare-api.flare.network/ext/C/rpc"
+
+#: Circle's FiatTokenProxy implementation slot ("org.zeppelinos.proxy.implementation").
+_CIRCLE_PROXY_SLOT = "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3"
+#: ERC-1967: keccak256("eip1967.proxy.implementation") - 1. Deliberately arbitrary, so
+#: a non-zero address word with deployed code behind it is a hit, not a coincidence.
+_ERC1967_PROXY_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
 
 
 def _attestation(
@@ -341,18 +363,17 @@ KNOWN_RAILS: dict[str, RailConfig] = {
     ),
     # --- Added by x402#3025 / #3031 (upstream default assets, 2026-08) -------------
     #
-    # Uncalibrated on purpose. A rail is only usable for live reconciliation once a
-    # reviewed block, runtime-code hash and proxy implementation have been captured
-    # from the chain independently; `calibrated=False` makes these fail closed until
-    # then, exactly like jpyc-polygon. Recording them now means an endpoint quoting
-    # these chains is a known-but-uncalibrated rail rather than an unknown one — the
-    # difference between "we refuse, and here is why" and "we have never heard of it".
+    # Registered from upstream's default-asset table and then **calibrated from the
+    # chain**, each from a single finalized block. The table is authoritative for which
+    # token an x402 endpoint on these chains quotes; it is not evidence about the
+    # contract, and these three attest to the contract.
     #
-    # `domain_name`/`domain_version` come from upstream's table, **not** from the
-    # contract. That is a claim, and EIP-712 hashes the domain string byte-exactly —
-    # `USD₮0` is one wrong character away from a domain no signature will ever match.
-    # Solve them with `tools/capture_rail_attestation.py` before any of these is
-    # calibrated; until then `calibrated=False` keeps the claim from being load-bearing.
+    # Every EIP-712 domain below was *solved* from the deployed contract's own
+    # `DOMAIN_SEPARATOR()` (tools/capture_rail_attestation.py), never copied from
+    # `name()`/`version()`. That distinction earned its keep on Flare: the contract
+    # exposes no `version()` at all, so the "1" there is not readable from the token and
+    # could only be recovered by reproducing the separator. A domain guessed wrong is a
+    # claim no test would catch, because every test would share it.
     "usdc-celo": RailConfig(
         "usdc-celo",
         "USDC on Celo",
@@ -363,12 +384,21 @@ KNOWN_RAILS: dict[str, RailConfig] = {
         "2",
         FinalityPolicy("finalized", 1),
         _attestation(
-            sources=(_CIRCLE_USDC, _EIP_3009, _X402_DEFAULT_ASSETS),
+            sources=(_CIRCLE_USDC, _EIP_3009, _X402_DEFAULT_ASSETS, _CELO_RPC),
             network_class="mainnet",
-            proxy_kind="unknown",
+            proxy_kind="fiat-token-proxy",
             decimals=6,
             domain_name="USDC",
             domain_version="2",
+            calibrated=True,
+            reviewed_block_number=74_742_375,
+            reviewed_block_hash="0x0e5b9dcd8f843fc8ddaa41bc578b82a0eb9149e1570eaeda534c6c7809b8b939",
+            expected_code_sha256="c8dd45e79870cb5e3d81e19f704c0fb54809c98f5be4243c552dc34a3ca7b6e4",
+            implementation_address="0xda06d4e3f59fe2c8ff3077a9d50d5be5e231becd",
+            proxy_implementation_slot=_CIRCLE_PROXY_SLOT,
+            implementation_code_sha256=(
+                "d13bec344a0650de736a9bfce03cd0930d5c117764f61ea3ed2357f70e817a14"
+            ),
             reviewed_on=_REVIEWED_2026_08_13,
             version=_ATTESTATION_VERSION_2026_08_13,
         ),
@@ -383,12 +413,21 @@ KNOWN_RAILS: dict[str, RailConfig] = {
         "2",
         FinalityPolicy("finalized", 1),
         _attestation(
-            sources=(_CIRCLE_USDC, _EIP_3009, _X402_DEFAULT_ASSETS),
+            sources=(_CIRCLE_USDC, _EIP_3009, _X402_DEFAULT_ASSETS, _CELO_SEPOLIA_RPC),
             network_class="testnet",
-            proxy_kind="unknown",
+            proxy_kind="fiat-token-proxy",
             decimals=6,
             domain_name="USDC",
             domain_version="2",
+            calibrated=True,
+            reviewed_block_number=33_358_890,
+            reviewed_block_hash="0x5982a282bf48188354af6583ea268bcafd0297c9b7ea30fa95e49fd57a7ccc9d",
+            expected_code_sha256="c9cf7c3f11c4d3d818801b5a965cea3bae6ff3b9b923242b91a9b4e5888e7835",
+            implementation_address="0x18b2bf98579267d4b108c5d82f816710a17efbb6",
+            proxy_implementation_slot=_CIRCLE_PROXY_SLOT,
+            implementation_code_sha256=(
+                "a0c17ab2e0a8e1e606fed223171bdf66dd58e8fa571b15e6af1bea4e640515d8"
+            ),
             reviewed_on=_REVIEWED_2026_08_13,
             version=_ATTESTATION_VERSION_2026_08_13,
         ),
@@ -403,12 +442,26 @@ KNOWN_RAILS: dict[str, RailConfig] = {
         "1",
         FinalityPolicy("finalized", 1),
         _attestation(
-            sources=(_EIP_3009, _X402_DEFAULT_ASSETS),
+            sources=(_EIP_3009, _X402_DEFAULT_ASSETS, _FLARE_RPC),
             network_class="mainnet",
-            proxy_kind="unknown",
+            # ERC-1967 rather than Circle's slot: a bridged token, not a FiatToken
+            # deployment. Probed, not assumed \u2014 that slot is arbitrary by
+            # construction, so a deployed implementation behind it is a hit.
+            proxy_kind="erc1967-proxy",
             decimals=6,
             domain_name="USD\u20ae0",
+            # Not readable from the contract: `version()` does not exist here. This
+            # value reproduces the observed DOMAIN_SEPARATOR and was recovered that way.
             domain_version="1",
+            calibrated=True,
+            reviewed_block_number=67_327_446,
+            reviewed_block_hash="0xeed7aaaa1f2998e09cd4e5a3da1c4226217a1ef84aa5fe877a29bd54aa6257cd",
+            expected_code_sha256="e518057ee9772b6d5ad104f0c0cbae96d42e5543dcaaff3b39257089ab5fe699",
+            implementation_address="0x779ded0c9e1022225f8e0630b35a9b54be713736",
+            proxy_implementation_slot=_ERC1967_PROXY_SLOT,
+            implementation_code_sha256=(
+                "6ed7b35f916bd991124be4fbfccfaa693f61f7a74800eea445fa8727463d6f44"
+            ),
             reviewed_on=_REVIEWED_2026_08_13,
             version=_ATTESTATION_VERSION_2026_08_13,
         ),

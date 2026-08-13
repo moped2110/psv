@@ -66,6 +66,11 @@ def test_known_rails_have_reviewed_runtime_metadata() -> None:
     assert get_rail("usdc-base").attestation.calibrated is True
     assert get_rail("eurc-base").attestation.calibrated is True
     assert get_rail("usdc-polygon").attestation.calibrated is True
+    assert get_rail("usdc-celo").attestation.calibrated is True
+    assert get_rail("usdc-celo-sepolia").attestation.calibrated is True
+    assert get_rail("usdt0-flare").attestation.calibrated is True
+    # The one rail still registered without on-chain evidence. It is the control:
+    # if this ever flips to True without a capture, calibration has become a label.
     assert get_rail("jpyc-polygon").attestation.calibrated is False
 
 
@@ -122,6 +127,36 @@ def test_polygon_usdc_and_base_usdc_do_not_share_a_domain() -> None:
     # would accept a Base authorization as proof of a Polygon settlement.
     assert polygon.chain_id != base.chain_id
     assert polygon.token_address.lower() != base.token_address.lower()
+
+
+def test_flare_domain_version_is_not_readable_from_the_contract() -> None:
+    """USD₮0 exposes no version(); the attested "1" came from the separator.
+
+    Pinned because it is the one value in the registry that cannot be re-derived by
+    reading an obvious getter. A future tidy-up that "corrects" it to None, or drops
+    it because the contract has no version(), would produce a domain that no
+    signature matches — and nothing else in the suite would notice.
+    """
+    flare = get_rail("usdt0-flare")
+    assert flare.token_version == "1"
+    assert flare.attestation.domain_version == "1"
+    assert flare.attestation.proxy_kind == "erc1967-proxy"
+
+
+def test_proxy_kind_domain_is_validated() -> None:
+    """A typo in proxy_kind must not pass as a reviewed deployment shape.
+
+    The field is load-bearing: `"none"` makes the drift check skip implementation
+    verification, and a proxy's runtime-code hash does not change when its
+    implementation is swapped. Validation cannot stop someone declaring a proxy as
+    `"none"` — it stops the value being something nobody chose.
+    """
+    attestation = get_rail("usdc-base").attestation
+    with pytest.raises(ValueError, match="unknown proxy_kind"):
+        replace(attestation, proxy_kind="fiat-token-prxy")
+    # Every reviewed kind still constructs.
+    for kind in ("none", "fiat-token-proxy", "vendor-proxy", "unknown"):
+        replace(attestation, proxy_kind=kind, calibrated=False)
 
 
 def test_unknown_rail_raises() -> None:
