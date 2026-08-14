@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import importlib
+import os
+from ctypes.util import find_library
+from pathlib import Path
 from types import ModuleType
 
 
@@ -12,12 +15,33 @@ class OQSProvider:
     def __init__(self) -> None:
         """Import liboqs lazily so core and primary installations remain isolated."""
         self._oqs: ModuleType | None
+        if not self._native_library_present():
+            self._oqs = None
+            self._reason = (
+                "oqs backend unavailable; install psv[pqc-oqs] and the native liboqs library"
+            )
+            return
         try:
             self._oqs = importlib.import_module("oqs")
             self._reason = ""
-        except ImportError:
+        except (ImportError, RuntimeError, SystemExit):
             self._oqs = None
-            self._reason = "oqs backend unavailable; install psv[pqc-oqs]"
+            self._reason = "oqs backend unavailable; native liboqs could not be loaded"
+
+    @staticmethod
+    def _native_library_present() -> bool:
+        """Detect liboqs without importing a wrapper that may start a source build."""
+        if find_library("oqs") or find_library("liboqs"):
+            return True
+        install_path = os.environ.get("OQS_INSTALL_PATH")
+        if not install_path:
+            return False
+        root = Path(install_path)
+        return any(
+            (root / directory / filename).is_file()
+            for directory in ("lib", "lib64")
+            for filename in ("liboqs.so", "liboqs.dylib")
+        )
 
     @property
     def available(self) -> bool:
