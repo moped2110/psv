@@ -53,7 +53,9 @@ Registry-Erweiterung mit Interoperabilitätsprüfung.
 ## Signierte Bytes und Domain Separation
 
 Beide Signaturen decken exakt dieselben Bytes ab. Dazu wird der gesamte Beleg ohne die
-beiden `signature`-Werte als kanonisches JSON nach RFC 8785 serialisiert. Diese Bytes
+beiden `signature`-Werte in einem festen PSV-Profil serialisiert: UTF-8, ASCII-
+Objektschlüssel lexikografisch sortiert, keine Leerzeichen, keine Gleitkommazahlen,
+Dezimalbeträge als Strings und keine doppelten Objektschlüssel. Diese Bytes
 werden mit dem ASCII-Präfix `PSV-RECEIPT-V2\x00` verbunden. Damit sind insbesondere
 `version`, beide `alg`-Werte, beide `kid`-Werte und sämtliche fachlichen
 Belegmetadaten von ECDSA und ML-DSA gemeinsam abgedeckt. Ein Angreifer kann daher weder
@@ -88,7 +90,8 @@ importiert.
 
 Eine ML-DSA-65-Signatur ist 3.309 Byte groß. Base64url benötigt dafür 4.412 Zeichen;
 mit `version`, Algorithmus-ID, Key-ID und JSON-Struktur beträgt der additive
-Wire-Overhead bei den Beispiel-IDs rund 4,55 KB je Beleg. Der 1.952-Byte-Public-Key
+Wire-Overhead bei den Beispiel-IDs 4.697 Byte je Beleg (kompaktes JSON, angenommene
+72-Byte-DER-ECDSA-Signatur). Der 1.952-Byte-Public-Key
 wird wegen `kid` nicht je Beleg übertragen. Der exakte Overhead hängt von den
 Key-ID-Längen und vorhandenen v1-Feldern ab und wird im Test reproduzierbar gemessen.
 
@@ -96,7 +99,10 @@ Verify-Latenzen sind hardware- und Backend-abhängig. Phase 1 legt deshalb keine
 universellen Zahlenwert als Sicherheitsversprechen fest: Der mitgelieferte Benchmark
 misst nach Warm-up mindestens 100 Verifikationen und berichtet p50/p99 für die konkrete
 CPU-, `cryptography`- und OpenSSL-Version. Diese Werte sind Betriebsdaten, kein Teil des
-Wire-Vertrags.
+Wire-Vertrags. Referenzmessung am 2026-08-14: `cryptography 48.0.1`, dessen Backend
+OpenSSL 4.0.1, 1.000 ML-DSA-65-Verifikationen nach 100 Warm-ups auf der lokalen
+CI-Worker-CPU: p50 0,196 ms, p99 0,468 ms. Die reproduzierbare Messmethode verwendet
+`time.perf_counter_ns`, sortiert Einzellatenzen und nimmt Median sowie Rang 990.
 
 ## Threat Model und ehrliche Grenze
 

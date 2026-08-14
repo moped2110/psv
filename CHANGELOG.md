@@ -5,6 +5,24 @@ All notable changes to psv are documented here. The format loosely follows
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-14
+
+### Added
+
+- Opt-in `psv.pqc` verification for version 2 facilitator receipts. Strict verification uses
+  ECDSA-P256-SHA256 and ML-DSA-65 as an AND-composition, binds both algorithm and key IDs, and
+  reports `Unverifiable Receipt` or `Naked Receipt` findings without changing the existing path.
+- Primary `cryptography`/OpenSSL 3.5 provider with runtime capability detection, plus an isolated
+  optional `psv[pqc-oqs]` backend. NIST ACVP ML-DSA-65 verification fixtures cover the primary
+  backend independently of implementation-generated material.
+- Versioned receipt-v2 JSON Schema and `docs/pqc-beleg-v2.md`, including downgrade handling,
+  key references, wire overhead, benchmark guidance, migration, rollback, and threat-model limits.
+
+### Changed
+
+- Package version is 0.4.0. The API addition is backward-compatible; `PSV_PQC` defaults to off,
+  and the disabled verifier returns the original receipt bytes without parsing or serialization.
+
 ## [0.3.0] — 2026-08-13
 
 ### Added

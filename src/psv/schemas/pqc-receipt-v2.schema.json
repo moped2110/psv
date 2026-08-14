@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/moped2110/psv/schemas/pqc-receipt-v2.schema.json",
+  "title": "PSV hybrid receipt signature v2",
+  "type": "object",
+  "required": ["sig_v2"],
+  "properties": {
+    "sig_v2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "classical", "pqc"],
+      "properties": {
+        "version": {"const": 2},
+        "classical": {"$ref": "#/$defs/classicalSignature"},
+        "pqc": {"$ref": "#/$defs/pqcSignature"}
+      }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "classicalSignature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alg", "kid", "signature"],
+      "properties": {
+        "alg": {"const": "ECDSA-P256-SHA256"},
+        "kid": {"type": "string", "minLength": 1, "maxLength": 128},
+        "signature": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_-]+$"}
+      }
+    },
+    "pqcSignature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alg", "kid", "signature"],
+      "properties": {
+        "alg": {"const": "ML-DSA-65"},
+        "kid": {"type": "string", "minLength": 1, "maxLength": 128},
+        "signature": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_-]+$"}
+      }
+    }
+  }
+}
