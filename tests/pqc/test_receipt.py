@@ -17,6 +17,7 @@ from psv.pqc.provider import CryptographyProvider
 pytest.importorskip("cryptography")
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, mldsa
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 
 def _b64(value: bytes) -> str:
@@ -55,7 +56,9 @@ def signed_receipt() -> tuple[bytes, dict[str, object], dict[str, bytes]]:
     classical["signature"] = _b64(classical_private.sign(payload, ec.ECDSA(hashes.SHA256())))
     pqc["signature"] = _b64(pqc_private.sign(payload))
     raw = json.dumps(receipt, separators=(",", ":"), ensure_ascii=False).encode()
-    classical_public = classical_private.public_key().public_bytes_raw()
+    classical_public = classical_private.public_key().public_bytes(
+        Encoding.X962, PublicFormat.UncompressedPoint
+    )
     pqc_public = pqc_private.public_key().public_bytes_raw()
     return raw, receipt, {"ecdsa-test": classical_public, "mldsa-test": pqc_public}
 
@@ -80,7 +83,9 @@ def test_feature_flag_accepts_explicit_true(monkeypatch: pytest.MonkeyPatch, val
     assert PQCConfig.from_env().enabled is True
 
 
-def test_flag_off_is_byte_identical(signed_receipt: tuple[bytes, dict[str, object], dict[str, bytes]]) -> None:
+def test_flag_off_is_byte_identical(
+    signed_receipt: tuple[bytes, dict[str, object], dict[str, bytes]],
+) -> None:
     raw, _, _ = signed_receipt
     result = verify_receipt(raw, classical_keys={}, pqc_keys={}, config=PQCConfig())
     assert result.status is VerificationStatus.DISABLED
@@ -88,7 +93,9 @@ def test_flag_off_is_byte_identical(signed_receipt: tuple[bytes, dict[str, objec
     assert result.finding is None
 
 
-def test_hybrid_receipt_positive(signed_receipt: tuple[bytes, dict[str, object], dict[str, bytes]]) -> None:
+def test_hybrid_receipt_positive(
+    signed_receipt: tuple[bytes, dict[str, object], dict[str, bytes]],
+) -> None:
     raw, _, keys = signed_receipt
     result = _verify(raw, keys)
     assert result.status is VerificationStatus.VERIFIED
@@ -153,6 +160,17 @@ def test_unknown_key_id_is_unverifiable_receipt(
 def test_malformed_json_is_unverifiable_receipt() -> None:
     result = verify_receipt(
         b"{",
+        classical_keys={},
+        pqc_keys={},
+        config=PQCConfig(enabled=True),
+    )
+    assert result.finding is FindingKind.UNVERIFIABLE_RECEIPT
+
+
+def test_duplicate_json_member_is_unverifiable_receipt() -> None:
+    raw = b'{"sig_v2":null,"sig_v2":null}'
+    result = verify_receipt(
+        raw,
         classical_keys={},
         pqc_keys={},
         config=PQCConfig(enabled=True),

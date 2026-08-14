@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "psv"
-version = "0.3.0"
+version = "0.4.0"
 description = "System-level verification harness for complete x402 payment systems (settlement, RPC, reconciliation, load)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -34,6 +34,10 @@ mcp = ["mcp>=2.0"]
 core = []
 # Talk to a chain and sign EIP-3009 authorizations.
 chain = ["web3>=7.0", "eth-account>=0.13"]
+# Verify hybrid receipt signatures with the primary audited backend.
+pqc = ["cryptography>=46"]
+# Optional research/test backend. Production verification should prefer `pqc`.
+pqc-oqs = ["cryptography>=46", "liboqs-python>=0.14"]
 # Run the bundled reference system-under-test.
 sut = [
     "fastapi>=0.110",
