@@ -8,16 +8,16 @@
 # --require-hashes then fails on 3.11 with "must have their versions pinned".
 pytest>=8.0
 pytest-cov>=5.0
-mypy>=1.10
-ruff>=0.6
-hypothesis>=6.156.7
+mypy>=2.3.1
+ruff>=0.16.5
+hypothesis>=6.167.1
 jsonschema>=4.23
 httpx>=0.27
-web3>=7.0
-eth-account>=0.13
+web3>=8.0.0
+eth-account>=0.14.0
 fastapi>=0.110
-uvicorn>=0.29
-build>=1.2
+uvicorn>=0.52.4
+build>=1.6.0
 hatchling>=1.27
 # Hatchling imports `editables` only when building an editable wheel, so a
 # resolver never sees it. CI installs the package with `pip install -e .`, which
@@ -27,13 +27,13 @@ twine>=5.1
 pip-audit>=2.7
 # Needed by the lock-drift guard in ci.yml, which regenerates this lock and diffs
 # it. Locking the resolver itself keeps that check reproducible.
-uv>=0.5
+uv>=0.12.9
 # The MCP SDK, so the strict type check sees its types and the MCP server's tests
 # actually run. Without it `pytest.importorskip("mcp")` skips them into silence.
-mcp>=2.0
+mcp>=2.1.1
 # Security floors for transitive dependencies. Neither is requested directly:
 # cryptography arrives via mcp, aiohttp via web3. `pip-audit --strict` fails the
 # supply-chain job while either is at a known-vulnerable version, so the floor is
 # what keeps that gate honest. Floors rather than pins — the resolver may go higher.
-cryptography>=50.0.0  # PYSEC-2026-3552
+cryptography>=50.0.1  # PYSEC-2026-3552
 aiohttp>=3.14.3       # PYSEC-2026-3545 / -3546 / -3547
