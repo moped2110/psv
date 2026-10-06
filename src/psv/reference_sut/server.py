@@ -27,6 +27,7 @@ from typing import Any
 
 from eth_account import Account
 
+from .. import __version__
 from ..anvil import RpcClient, RpcError
 from ..chain import TokenView
 from ..quote_option import quote_is_stale
@@ -313,7 +314,7 @@ def create_app(config: SutConfig) -> Any:
     from fastapi.responses import JSONResponse
 
     sut = ReferenceSut(config)
-    app = FastAPI(title="psv reference SUT", version="0.1.0")
+    app = FastAPI(title="psv reference SUT", version=__version__)
 
     @app.post("/quote")
     def quote() -> dict[str, Any]:

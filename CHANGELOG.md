@@ -5,6 +5,43 @@ All notable changes to psv are documented here. The format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The three 2026-08 rails are calibrated from the chain, and their EIP-712 domains are
+  solved, not asserted** (`usdc-celo`, `usdc-celo-sepolia`, `usdt0-flare`; closes the
+  0.3.0 known gap). They were registered from upstream's table and then read: one
+  finalized block each, runtime-code hash, proxy slot, implementation address and its
+  code hash. The domains were recovered by reproducing each contract's own
+  `DOMAIN_SEPARATOR()`. That distinction paid on Flare, where the contract exposes
+  **no `version()` at all** — the attested `"1"` is not readable from the token and
+  could only be found by solving for it. Both USDC deployments answer on Circle's proxy
+  slot; Flare's `USD₮0` is an ERC-1967 proxy, probed rather than assumed, which is a new
+  reviewed `proxy_kind`.
+- **`proxy_kind` is validated against a reviewed set.** The field is load-bearing:
+  `"none"` makes `check_rail_drift` skip implementation verification entirely, and a
+  proxy's runtime-code hash does *not* change when its implementation is swapped —
+  so a wrong `"none"` blinds the drift check to the one change it exists to catch.
+  Validation cannot stop that choice being wrong; it stops the value being a typo, and
+  makes a new kind a deliberate addition.
+
+### Fixed
+
+- **`psv.__version__` comes from the installed distribution.** It was hard-coded to
+  `"0.1.0"` and never moved through 0.2.0 and 0.3.0 — and run records copy it into
+  `tool.version`, so every record since 0.1.0 named the wrong release of the tool that
+  produced it, and the MCP server advertised the same stale version. It is now read
+  from package metadata (one source of truth: `pyproject.toml`), with a `0.0.0+source`
+  fallback for an uninstalled source tree; the reference SUT's FastAPI app reports it
+  too. A test pins `__version__` to the installed metadata.
+
+### Documented
+
+- `docs/rails.md` lists every registered rail, and a test keeps that list in step with
+  the registry. The README's list of extras now includes `mcp` and `core`.
+- The released 0.3.0 section below is restored to what was tagged. The calibration
+  above had been written into it after the tag, which made the changelog claim the
+  `v0.3.0` artifact contained work it does not.
+
 ## [0.3.0] — 2026-08-13
 
 ### Added
@@ -57,20 +94,15 @@ All notable changes to psv are documented here. The format loosely follows
   that signal can be true while the payment is not. `docs/sc1-abi-drift.md`
   records the connection.
 
-- **All three are now calibrated from the chain, and their EIP-712 domains are solved,
-  not asserted.** They were registered from upstream's table and then read: one finalized
-  block each, runtime-code hash, proxy slot, implementation address and its code hash.
-  The domains were recovered by reproducing each contract's own `DOMAIN_SEPARATOR()`.
-  That distinction paid on Flare, where the contract exposes **no `version()` at all** —
-  the attested `"1"` is not readable from the token and could only be found by solving
-  for it. Both USDC deployments answer on Circle's proxy slot; Flare's `USD₮0` is an
-  ERC-1967 proxy, probed rather than assumed, which is a new reviewed `proxy_kind`.
-- **`proxy_kind` is validated against a reviewed set.** The field is load-bearing:
-  `"none"` makes `check_rail_drift` skip implementation verification entirely, and a
-  proxy's runtime-code hash does *not* change when its implementation is swapped —
-  so a wrong `"none"` blinds the drift check to the one change it exists to catch.
-  Validation cannot stop that choice being wrong; it stops the value being a typo, and
-  makes a new kind a deliberate addition.
+### Known gap
+
+- **The three new rails' EIP-712 domains are asserted, not solved.** `domain_name` and
+  `domain_version` for `usdc-celo`, `usdc-celo-sepolia` and `usdt0-flare` come from
+  upstream's default-asset table rather than from each contract's `DOMAIN_SEPARATOR()`.
+  EIP-712 hashes the domain string byte-exactly, so `USD₮0` is one character away from a
+  domain no signature will ever match. `calibrated=False` keeps the claim from being
+  load-bearing today; solve them with `tools/capture_rail_attestation.py` before any of
+  these is calibrated.
 
 ## [0.2.0] — 2026-08-06
 

@@ -61,8 +61,10 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
 
-Available extras are `chain`, `sut`, `dev` and `release`. The `sut` extra includes
-its signing/recovery runtime dependency; the core CLI remains dependency-light.
+Available extras are `chain`, `sut`, `mcp`, `core`, `dev` and `release`. The `sut`
+extra includes its signing/recovery runtime dependency, `mcp` installs the MCP server
+(`psv-mcp`), and `core` is an empty marker for consumers that provision extras from a
+capability map; the core CLI remains dependency-light.
 
 ## Test
 
