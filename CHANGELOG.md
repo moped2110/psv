@@ -5,6 +5,20 @@ All notable changes to psv are documented here. The format loosely follows
 
 ## [Unreleased]
 
+### Documented
+
+- **`docs/DEVELOPER.md`** is the developer entry point. It covers the full
+  module map, install from a git tag, the hash-locked setup and Anvil, the gates,
+  how scenarios, verdicts and pay outcomes work, adding a detector, scenario,
+  rail or settlement chain, the release process (feature PR, `release/X.Y.Z`
+  PR, rebase merge, annotated tag) and how psv relates to x402-conformance, rvf
+  and the hosted lab. It links to the existing documents rather than repeating
+  them.
+- **`docs/EINFACH-ERKLAERT.md`** explains psv in plain German for
+  non-technical readers: the problem, the mechanism, what each verdict means
+  (including the pending outcome), what psv does not do, and a short glossary.
+  Both are linked from the README.
+
 ## [0.5.0] — 2026-10-06
 
 ### Added
