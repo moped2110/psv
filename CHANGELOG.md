@@ -15,6 +15,9 @@ All notable changes to psv are documented here. The format loosely follows
 - Primary `cryptography`/OpenSSL 3.5 provider (`psv[pqc]`) with runtime capability detection,
   plus an isolated optional `psv[pqc-oqs]` backend. NIST ACVP ML-DSA-65 verification fixtures
   cover the primary backend independently of implementation-generated material.
+- A signed receipt-v2 interop vector (`tests/pqc/vectors/receipt-v2-interop.json`, test keys
+  only) that x402-conformance carries byte-identically and verifies with its own
+  canonicalization, so the two implementations cannot drift apart unnoticed.
 - Versioned receipt-v2 JSON Schema and `docs/pqc-receipt-v2.md`, including downgrade handling,
   key references, wire overhead, latency-measurement guidance, migration, rollback, and
   threat-model limits.
