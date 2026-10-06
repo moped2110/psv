@@ -16,7 +16,15 @@ are exactly the failures (vanished payments, double credits, reorg blindness)
 that black-box conformance cannot see.
 """
 
-__version__ = "0.1.0"
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+
+try:
+    #: Single source of truth: the installed distribution's version (from pyproject.toml).
+    #: Run records copy this into ``tool.version``, so a hand-typed value goes stale silently.
+    __version__ = _pkg_version("psv")
+except PackageNotFoundError:  # a source tree on sys.path without an installed dist
+    __version__ = "0.0.0+source"
 
 # Pinned reference deployment used across the harness.
 # Anvil's first account deploys deterministically to this address.
