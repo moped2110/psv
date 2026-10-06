@@ -35,9 +35,9 @@ core = []
 # Talk to a chain and sign EIP-3009 authorizations.
 chain = ["web3>=7.0", "eth-account>=0.13"]
 # Verify hybrid receipt signatures with the primary audited backend.
-pqc = ["cryptography>=46"]
+pqc = ["cryptography>=50"]
 # Optional research/test backend. Production verification should prefer `pqc`.
-pqc-oqs = ["cryptography>=46", "liboqs-python>=0.14"]
+pqc-oqs = ["cryptography>=50", "liboqs-python>=0.14"]
 # Run the bundled reference system-under-test.
 sut = [
     "fastapi>=0.110",

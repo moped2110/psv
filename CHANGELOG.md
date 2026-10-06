@@ -13,7 +13,9 @@ All notable changes to psv are documented here. The format loosely follows
   The addition is backward-compatible: `PSV_PQC` defaults to off, and the disabled verifier
   returns the original receipt bytes without parsing or serialization.
 - Primary `cryptography`/OpenSSL 3.5 provider (`psv[pqc]`) with runtime capability detection,
-  plus an isolated optional `psv[pqc-oqs]` backend. NIST ACVP ML-DSA-65 verification fixtures
+  plus an isolated optional `psv[pqc-oqs]` backend. Both extras require `cryptography>=50`,
+  the floor the CI lock already enforces for PYSEC-2026-3552, so a published install cannot
+  resolve a cryptography release with that advisory. NIST ACVP ML-DSA-65 verification fixtures
   cover the primary backend independently of implementation-generated material.
 - A signed receipt-v2 interop vector (`tests/pqc/vectors/receipt-v2-interop.json`, test keys
   only) that x402-conformance carries byte-identically and verifies with its own
