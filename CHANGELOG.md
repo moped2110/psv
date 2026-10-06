@@ -19,7 +19,9 @@ All notable changes to psv are documented here. The format loosely follows
   cover the primary backend independently of implementation-generated material.
 - A signed receipt-v2 interop vector (`tests/pqc/vectors/receipt-v2-interop.json`, test keys
   only) that x402-conformance carries byte-identically and verifies with its own
-  canonicalization, so the two implementations cannot drift apart unnoticed.
+  canonicalization, so the two implementations cannot drift apart unnoticed. Its `rejected`
+  receipt texts (floats, `NaN`, repeated and non-ASCII member names) must be refused by both
+  with the same error.
 - Versioned receipt-v2 JSON Schema and `docs/pqc-receipt-v2.md`, including downgrade handling,
   key references, wire overhead, latency-measurement guidance, migration, rollback, and
   threat-model limits.
