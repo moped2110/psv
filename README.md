@@ -52,6 +52,12 @@ The machine-readable source of support truth is
 [`support-matrix.json`](support-matrix.json). The exact guarantees and limitations
 of a green run are in [`docs/support-matrix.md`](docs/support-matrix.md).
 
+New here? [`docs/DEVELOPER.md`](docs/DEVELOPER.md) is the developer entry point:
+the module map, setup, gates, how scenarios and verdicts work, how to add a
+scenario or rail, the release process, and how psv relates to the projects that
+use it. [`docs/EINFACH-ERKLAERT.md`](docs/EINFACH-ERKLAERT.md) explains psv in
+plain German for non-technical readers.
+
 ## Install
 
 Python 3.11 or newer is required.
