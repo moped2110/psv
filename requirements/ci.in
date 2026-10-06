@@ -31,9 +31,15 @@ uv>=0.5
 # The MCP SDK, so the strict type check sees its types and the MCP server's tests
 # actually run. Without it `pytest.importorskip("mcp")` skips them into silence.
 mcp>=2.0
-# Security floors for transitive dependencies. Neither is requested directly:
+# Security floors for transitive dependencies. None is requested directly:
 # cryptography arrives via mcp, aiohttp via web3. `pip-audit --strict` fails the
-# supply-chain job while either is at a known-vulnerable version, so the floor is
+# supply-chain job while any of them is at a known-vulnerable version, so the floor is
 # what keeps that gate honest. Floors rather than pins — the resolver may go higher.
 cryptography>=50.0.0  # PYSEC-2026-3552
 aiohttp>=3.14.3       # PYSEC-2026-3545 / -3546 / -3547
+# Same reason, 2026-10: httpx2/httpcore2 arrive via mcp, urllib3 via the release
+# tooling and web3 (via requests), pyjwt via mcp, multidict via aiohttp.
+httpx2>=2.12.0        # PYSEC-2026-3846 / -3848 / -3849
+urllib3>=2.8.0        # PYSEC-2026-4175 / -4176 / -4177
+pyjwt>=2.15.0         # PYSEC-2026-4140..4152, CVE-2026-102275
+multidict>=6.9.1      # CVE-2026-104874
