@@ -5,6 +5,8 @@ All notable changes to psv are documented here. The format loosely follows
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-10-06
+
 ### Added
 
 - **Pending pay outcome.** `PayResult.outcome` (`psv.sut.PayOutcome`) maps a pay answer to
