@@ -5,6 +5,8 @@ All notable changes to psv are documented here. The format loosely follows
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-10-06
+
 ### Added
 
 - Opt-in `psv.pqc` verification for version 2 facilitator receipts. Strict verification uses
