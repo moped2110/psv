@@ -7,6 +7,7 @@ import math
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 from urllib.parse import quote as quote_path_segment
 
@@ -18,6 +19,11 @@ _AMOUNT_RE = re.compile(r"^(?:0|[1-9][0-9]*)$")
 _MAX_ORDER_ID_CHARS = 256
 _MAX_TEXT_CHARS = 16_384
 _MAX_RESPONSE_BYTES = 1024 * 1024
+
+#: The x402 v2 error code (CORE §9) for a settlement whose broadcast succeeded but
+#: whose confirmation could not be established. It is non-terminal: the transfer may
+#: still land, so the caller reconciles the named transaction on chain before retrying.
+SETTLEMENT_PENDING = "settlement_pending"
 
 
 class SutAdapterError(ValueError):
@@ -45,6 +51,19 @@ class Quote:
         return int(match.group(1))
 
 
+class PayOutcome(str, Enum):
+    """What a pay answer means for the order, before chain truth is consulted.
+
+    ``PENDING`` is the non-terminal x402 ``settlement_pending`` outcome: the SUT broadcast
+    a settlement (and names it) but could not confirm it. It is neither paid nor unpaid
+    yet; the harness reconciles the named transaction on chain before it grades the order.
+    """
+
+    SETTLED = "settled"
+    PENDING = "pending"
+    UNSETTLED = "unsettled"
+
+
 @dataclass(frozen=True)
 class PayResult:
     """Normalized result of submitting an authorization for an order."""
@@ -52,6 +71,22 @@ class PayResult:
     order_id: str
     submitted_tx: str | None
     settled: bool
+    reason: str | None = None
+
+    @property
+    def outcome(self) -> PayOutcome:
+        """Map the answer to settled, pending (``settlement_pending`` + a tx) or unsettled.
+
+        A failed settle is pending only when it both carries ``settlement_pending`` and
+        names the broadcast transaction: without a hash there is nothing to reconcile,
+        and x402 requires ``unexpected_settle_error`` there instead, so that answer stays
+        unsettled.
+        """
+        if self.settled:
+            return PayOutcome.SETTLED
+        if self.reason == SETTLEMENT_PENDING and self.submitted_tx is not None:
+            return PayOutcome.PENDING
+        return PayOutcome.UNSETTLED
 
 
 @dataclass(frozen=True)
@@ -193,10 +228,17 @@ def parse_quote(body: object) -> Quote:
 def parse_pay(body: object, *, expected_order_id: str | None = None) -> PayResult:
     """Strictly parse a pay response and optionally bind its order id."""
     parsed = _body_object(body, "pay")
+    settled = _boolean(_required(parsed, "settled", "pay"), "settled")
+    reason = _wire_string(parsed.get("reason"), "reason", nullable=True)
+    if settled and reason == SETTLEMENT_PENDING:
+        # settlement_pending is a failure code (x402 sends it with success: false); a
+        # "settled" answer carrying it contradicts itself, so fail closed.
+        raise SutAdapterError("pay: settled answer carries reason settlement_pending")
     return PayResult(
         order_id=_matching_order_id(parsed, "pay", expected_order_id),
         submitted_tx=_transaction_hash(parsed.get("submitted_tx"), "submitted_tx"),
-        settled=_boolean(_required(parsed, "settled", "pay"), "settled"),
+        settled=settled,
+        reason=reason,
     )
 
 

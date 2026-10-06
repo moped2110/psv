@@ -12,6 +12,9 @@ Configurable weaknesses let the harness exercise the system-level damage cases:
   * **G3** - a quote locks a price against a movable fair-value oracle (free option).
   * **I**  - idempotency: without it, re-paying a settled order re-submits on-chain.
   * **delay** - confirming a settlement before it is mined yields a false negative.
+  * **pending** - a broadcast whose receipt cannot be fetched is answered with the
+    non-terminal x402 ``settlement_pending`` and its tx hash; an idempotent SUT's retry
+    waits on that hash, a vulnerable one broadcasts the authorization again.
 
 Run on a dev machine alongside Anvil (needs [sut] + [chain] extras). The harness
 talks to it solely over HTTP (or in-process), so any implementation can replace it.
@@ -39,6 +42,7 @@ from ..reconciliation import (
     topic_addr,
 )
 from ..safety import DEFAULT_SETTLEMENT_SAFETY_POLICY
+from ..sut import SETTLEMENT_PENDING
 from .confirmer import TOPIC_TRANSFER as CONFIRMER_TOPIC
 from .confirmer import EventWatchingConfirmer
 
@@ -67,6 +71,9 @@ class SutConfig:
     # tx to be mined before confirming. On (vulnerable) it checks the event
     # immediately, so a not-yet-mined settlement looks unpaid (false negative).
     confirm_without_waiting: bool = False
+    # Receipt polls after a broadcast before the SUT stops waiting and answers the
+    # non-terminal `settlement_pending` (x402 CORE §9) with the broadcast tx hash.
+    receipt_tries: int = 50
 
 
 @dataclass
@@ -82,6 +89,8 @@ class _Order:
     created_block: int = 0
     recovered: bool = False  # set by reconciliation
     settle_attempts: int = 0  # how many times settlement was submitted on-chain
+    pending_tx: str | None = None  # broadcast answered settlement_pending, unresolved
+    pending_authorization: dict[str, Any] | None = None  # the authorization pending_tx carries
     settlement_identity: SettlementIdentity | None = None
 
 
@@ -148,6 +157,19 @@ class ReferenceSut:
                 "idempotent": True,
             }
 
+        # Pending retry. The last attempt broadcast a settlement and answered
+        # settlement_pending, so the transfer may still land. An idempotent SUT waits on
+        # that hash instead of broadcasting the authorization again (x402: a retry of
+        # the same payload waits on the pending transaction). This runs before the G3
+        # guards on purpose: an in-flight settlement is reconciled even once the quote
+        # has expired. The vulnerable default falls through and broadcasts again.
+        if (
+            order.pending_tx is not None
+            and order.pending_authorization is not None
+            and self.config.idempotent_pay
+        ):
+            return self._confirm(order, order.pending_authorization, order.pending_tx)
+
         # G3 guards - refuse to settle an expired or stale (under-priced) quote.
         now = int(time.time())
         if now > order.expires_at:
@@ -161,11 +183,33 @@ class ReferenceSut:
         order.settle_attempts += 1
         tx_hash = self._submit_settlement(authorization)
         order.submitted_tx = tx_hash
+        return self._confirm(order, authorization, tx_hash)
+
+    def _confirm(
+        self, order: _Order, authorization: dict[str, Any], tx_hash: str
+    ) -> dict[str, Any]:
+        """Confirm one broadcast settlement, or answer settlement_pending with its hash."""
+        order_id = order.order_id
         # Wait for the settlement to be mined before confirming. Skipping this
         # (the vulnerable mode) checks too early and reports a false "unpaid".
         receipt: dict[str, Any] | None = None
         if not self.config.confirm_without_waiting:
-            receipt = self.rpc.wait_for_receipt(tx_hash)
+            try:
+                receipt = self.rpc.wait_for_receipt(tx_hash, tries=self.config.receipt_tries)
+            except RpcError:
+                # Broadcast succeeded, confirmation could not be established (timeout or
+                # RPC failure). Not success and not a terminal failure: the transfer may
+                # still land. Name the tx so the caller can reconcile it on chain.
+                order.pending_tx = tx_hash
+                order.pending_authorization = dict(authorization)
+                return {
+                    "order_id": order_id,
+                    "submitted_tx": tx_hash,
+                    "settled": False,
+                    "reason": SETTLEMENT_PENDING,
+                }
+        order.pending_tx = None
+        order.pending_authorization = None
         # Confirm by watching the legacy Transfer event - the SC1-vulnerable step.
         settlement_log_index = self.confirmer.settlement_log_index(
             token=self.config.token_address,

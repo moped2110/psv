@@ -13,7 +13,8 @@ tested inputs. It does not exercise a blockchain.
 
 An Anvil green run additionally certifies the registered EVM system scenarios against
 the bundled mock token and reference SUT on the configured local chain: settlement,
-idempotency, cross-chain replay rejection, event drift, reorg invalidation, delayed or
+idempotency (including the single retry after a `settlement_pending` answer, which must
+wait on the named transaction rather than broadcast again), cross-chain replay rejection, event drift, reorg invalidation, delayed or
 stuck settlement, fee-on-transfer underpayment, recovery, and reconciliation. Load
 scenarios remain opt-in under the `load` marker and include concurrent ramp, spike,
 soak, breakpoint, and recovery profiles over independent facilitator accounts.

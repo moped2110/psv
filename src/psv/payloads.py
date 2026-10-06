@@ -38,7 +38,7 @@ def _require_evm() -> None:
     """Fail with installation guidance when optional EVM signing support is absent."""
     if not _EVM_AVAILABLE:
         raise RuntimeError(
-            "EIP-3009 signing requires eth-account. Install with: pip install psv[chain]"
+            'EIP-3009 signing requires eth-account: install the [chain] extra (see README "Install")'
         )
 
 

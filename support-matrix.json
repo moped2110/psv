@@ -5,6 +5,7 @@
     {"id": "PSV-E2E-001", "phase": "phase-1", "severity": "P0", "test": "tests/test_e2e_happy.py::test_happy_path_quote_pay_confirm_deliver", "environment": "anvil", "status": "implemented"},
     {"id": "PSV-C0-001", "phase": "phase-2", "severity": "P0", "test": "tests/test_c0_cross_chain_replay.py::test_cross_chain_replayed_authorization_does_not_settle", "environment": "anvil", "status": "implemented"},
     {"id": "PSV-I-001", "phase": "phase-2", "severity": "P0", "test": "tests/test_i_idempotency.py::test_idempotent_sut_does_not_resubmit", "environment": "anvil", "status": "implemented"},
+    {"id": "PSV-I-002", "phase": "phase-3", "severity": "P0", "test": "tests/test_i_idempotency.py::test_retry_after_settlement_pending_does_not_broadcast_again", "environment": "anvil", "status": "implemented"},
     {"id": "PSV-N16-001", "phase": "phase-2", "severity": "P0", "test": "tests/test_n16_eoa_asset_silent_noop.py::test_settling_against_an_eoa_is_a_silent_noop", "environment": "anvil", "status": "implemented"},
     {"id": "PSV-SC1-001", "phase": "phase-2", "severity": "P0", "test": "tests/test_sc1_abi_drift.py::test_sc1_event_drift_causes_silent_loss_detected_by_harness", "environment": "anvil", "status": "implemented"},
     {"id": "PSV-R-001", "phase": "phase-2", "severity": "P0", "test": "tests/test_r_reorg_invalidation.py::test_reorg_undoes_settlement_but_sut_keeps_phantom_credit", "environment": "anvil", "status": "implemented"},
