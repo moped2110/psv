@@ -61,10 +61,12 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
 
-Available extras are `chain`, `sut`, `mcp`, `core`, `dev` and `release`. The `sut`
-extra includes its signing/recovery runtime dependency, `mcp` installs the MCP server
-(`psv-mcp`), and `core` is an empty marker for consumers that provision extras from a
-capability map; the core CLI remains dependency-light.
+Available extras are `chain`, `sut`, `mcp`, `core`, `pqc`, `pqc-oqs`, `dev` and
+`release`. The `sut` extra includes its signing/recovery runtime dependency, `mcp` installs
+the MCP server (`psv-mcp`), `pqc` enables opt-in hybrid receipt-v2 verification
+(`docs/pqc-receipt-v2.md`; `pqc-oqs` adds an optional liboqs backend), and `core` is an empty
+marker for consumers that provision extras from a capability map; the core CLI remains
+dependency-light.
 
 ## Test
 
