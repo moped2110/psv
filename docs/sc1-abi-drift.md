@@ -83,6 +83,26 @@ even the event alone is not enough once a token can change what it emits, which
 is why the defenses below ask for independent signals rather than a better single
 one.
 
+Two later scheme specs state the same rule for their chains (`x402-foundation/x402`
+@ `cb0ec5b`, reviewed 2026-10-06):
+
+- **Starknet** (`specs/schemes/exact/scheme_exact_starknet.md`, d6d2c580, #3126):
+  settlement succeeds only if the receipt is `SUCCEEDED` **and** it emits exactly the
+  expected payer-scoped `Transfer`; a non-reverting transaction without it is a failure,
+  because the call runs inside the payer's own account. A consumed nonce is terminal,
+  success is reported only for a transaction the facilitator broadcast itself, and when
+  confirmation cannot be established the answer is the non-terminal `settlement_pending`
+  with the hash, never a re-broadcast of the same authorization.
+- **Hedera** (`specs/schemes/exact/scheme_exact_hedera.md`, Phase 4): the outcome comes
+  from the consensus record, child records included, not from the receipt status: "a
+  `SUCCESS` receipt with no transfer is a failed settlement". An unobtainable record is
+  `settlement_pending` with the transaction id.
+
+Both are psv's reconcile-from-chain stance: the effect on chain decides, not the
+signal that reports it. psv grades a `settlement_pending` answer that names its
+transaction as a pending outcome (`psv.sut.PayOutcome.PENDING`) and the retry that
+follows it in PSV-I-002.
+
 ## Defenses a real system should adopt (and `psv` can verify)
 
 - Confirm settlement on **multiple independent signals** (balance delta and/or

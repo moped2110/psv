@@ -147,7 +147,7 @@ docstrings.
 | ABI and numeric domains | `test_abi_encoding_property`, `test_abi_strict_unit`, `test_numeric_domains_unit`, `test_payloads_unit`, `test_token_quirks_unit`, `test_quote_option_unit` |
 | Atomic reconciliation and reports | `test_reconciliation_unit`, `test_reconciliation_property`, `test_reconciliation_multiasset`, `test_reconcile_negative_paths`, `test_rails_unit`, `test_cli_unit`, `test_run_record_unit` |
 | Safety and reference SUT | `test_reference_sut_safety`, `test_confirmer_unit`, `test_server_unit`, `test_eoa_asset_unit`, `test_security_unit` |
-| System damage cases | happy path, SC1 drift, C0 replay, D3 restore, G3 option, reorg invalidation, idempotency, EOA asset, fee-on-transfer, delay, stuck mempool, and facilitator crash test files |
+| System damage cases | happy path, SC1 drift, C0 replay, D3 restore, G3 option, reorg invalidation, idempotency (with the `settlement_pending` retry), EOA asset, fee-on-transfer, delay, stuck mempool, and facilitator crash test files |
 | Differential and properties | `test_differential_unit`, `test_divergence_unit`, `test_divergence_property`, `test_edge_cases_unit`, `test_eurc_domain` |
 | Opt-in load/on-chain | `test_load_unit`, `test_load_throughput`, and all tests marked `onchain` or `load` |
 | Repository contracts | `test_support_matrix`, `test_public_repo_sanitation`, `test_function_docs` |

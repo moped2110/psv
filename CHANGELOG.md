@@ -5,6 +5,47 @@ All notable changes to psv are documented here. The format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Pending pay outcome.** `PayResult.outcome` (`psv.sut.PayOutcome`) maps a pay answer to
+  `settled`, `pending` or `unsettled`. A failed settle that names its transaction and carries
+  x402's non-terminal `settlement_pending` (CORE §9) is `pending`: the transfer may still
+  land, so the order is neither paid nor unpaid until the named transaction is reconciled.
+  Before, it was indistinguishable from any other unsettled answer. `settlement_pending`
+  without a hash stays `unsettled` (nothing to reconcile; x402 requires
+  `unexpected_settle_error` there), and a `settled` answer carrying it is rejected.
+- **PSV-I-002** (P0, Anvil): the resource server's single retry after `settlement_pending`
+  must not broadcast a second settlement. The reference SUT now answers a broadcast whose
+  receipt cannot be fetched (`receipt_tries`, default 50 polls) with `settlement_pending`
+  and the tx hash instead of an error. With `idempotent_pay` its retry waits on that hash
+  with the original authorization, also after the quote expired; the vulnerable default
+  broadcasts the authorization again, the second transaction reverts, and the order is
+  booked unpaid although the first one paid: a silent loss the chain-truth oracle catches.
+
+### Changed
+
+- The pay wire's optional `reason` is now parsed: a bounded non-empty string or null.
+  Any other type fails closed like the rest of the contract.
+
+### Documented
+
+- **Install from GitHub, not PyPI.** The PyPI name `psv` belongs to an unrelated CSV parser
+  (<https://pypi.org/project/psv/>), so README's `pip install "psv[mcp]"` installed the
+  wrong package. README's Install and MCP sections now use
+  `pip install "psv[mcp] @ git+https://github.com/moped2110/psv@v0.5.0"`, and the missing
+  eth-account hint points at README "Install" instead of `pip install psv[chain]`.
+- `docs/sc1-abi-drift.md` cites the Starknet (d6d2c580, #3126) and Hedera (Phase 4)
+  settle-semantics clarifications at `x402-foundation/x402@cb0ec5b`: on-chain effect, not
+  receipt status, decides, and an unconfirmed broadcast is `settlement_pending` with its
+  hash. Both match psv's reconcile-from-chain stance.
+
+### Not done (follow-up)
+
+- New rails from the 2026-10 upstream DEFAULT_ASSETS (Sei `eip155:1329`/`1328`, Monad
+  testnet `eip155:10143`, Arc `eip155:5042`/`5042002`, Celo USDT and USAT). No calibration
+  data exists yet; a rail is registered only with a one-block attestation captured by
+  `tools/capture_rail_attestation.py`.
+
 ## [0.4.0] — 2026-10-06
 
 ### Added

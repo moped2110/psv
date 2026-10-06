@@ -10,7 +10,9 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from psv.sut import (
+    SETTLEMENT_PENDING,
     HttpSutAdapter,
+    PayOutcome,
     Quote,
     SutAdapterError,
     parse_pay,
@@ -204,3 +206,61 @@ def test_adapter_normalizes_response_read_and_close_failures() -> None:
         adapter.quote()
     with pytest.raises(SutAdapterError, match="unable to close HTTP client"):
         adapter.close()
+
+
+def test_failed_settle_with_tx_and_settlement_pending_is_a_pending_outcome() -> None:
+    pending = parse_pay(
+        {
+            "order_id": "ord",
+            "submitted_tx": TX_HASH,
+            "settled": False,
+            "reason": SETTLEMENT_PENDING,
+        },
+        expected_order_id="ord",
+    )
+    assert pending.outcome is PayOutcome.PENDING
+    assert pending.reason == "settlement_pending"
+    assert pending.submitted_tx == TX_HASH
+
+
+@pytest.mark.parametrize(
+    ("body", "outcome"),
+    [
+        ({"submitted_tx": TX_HASH, "settled": True}, PayOutcome.SETTLED),
+        ({"submitted_tx": TX_HASH, "settled": False}, PayOutcome.UNSETTLED),
+        ({"submitted_tx": None, "settled": False, "reason": "quote_expired"}, PayOutcome.UNSETTLED),
+        # A terminal failure that names its tx stays unsettled, not pending.
+        (
+            {"submitted_tx": TX_HASH, "settled": False, "reason": "stale_quote"},
+            PayOutcome.UNSETTLED,
+        ),
+        # settlement_pending without a hash leaves nothing to reconcile (x402 sends
+        # unexpected_settle_error there), so it is not a pending outcome.
+        (
+            {"submitted_tx": None, "settled": False, "reason": "settlement_pending"},
+            PayOutcome.UNSETTLED,
+        ),
+        ({"settled": False, "reason": "settlement_pending"}, PayOutcome.UNSETTLED),
+        ({"submitted_tx": TX_HASH, "settled": False, "reason": None}, PayOutcome.UNSETTLED),
+    ],
+)
+def test_pay_outcome_mapping(body: dict[str, object], outcome: PayOutcome) -> None:
+    assert parse_pay({"order_id": "ord", **body}).outcome is outcome
+
+
+def test_settled_answer_carrying_settlement_pending_is_rejected() -> None:
+    with pytest.raises(SutAdapterError, match="settlement_pending"):
+        parse_pay(
+            {
+                "order_id": "ord",
+                "submitted_tx": TX_HASH,
+                "settled": True,
+                "reason": "settlement_pending",
+            }
+        )
+
+
+@pytest.mark.parametrize("reason", [123, "", True, {"code": "settlement_pending"}])
+def test_pay_reason_must_be_a_bounded_string_or_null(reason: object) -> None:
+    with pytest.raises(SutAdapterError, match="reason"):
+        parse_pay({"order_id": "ord", "submitted_tx": TX_HASH, "settled": False, "reason": reason})

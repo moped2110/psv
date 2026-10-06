@@ -42,7 +42,8 @@ cannot detect.
   attempted/successful throughput and bounded error evidence.
 
 The demonstrated damage scenarios include event/ABI drift (SC1), ledger restore
-divergence (D3), quote-as-option (G3), reorg invalidation, idempotency, delayed or
+divergence (D3), quote-as-option (G3), reorg invalidation, idempotency (including the
+retry after a `settlement_pending` answer), delayed or
 stuck settlement, facilitator crash, fee-on-transfer underpayment, cross-chain
 replay, fake/EOA assets and differential SUT behavior. See [`docs/`](docs/) for
 the scenario explanations.
@@ -54,6 +55,18 @@ of a green run are in [`docs/support-matrix.md`](docs/support-matrix.md).
 ## Install
 
 Python 3.11 or newer is required.
+
+psv is not published on PyPI, and the PyPI name `psv` belongs to an unrelated CSV
+parser (<https://pypi.org/project/psv/>): `pip install psv` or `pip install "psv[mcp]"`
+installs the wrong package. Install a tagged release from GitHub instead:
+
+```bash
+pip install "psv @ git+https://github.com/moped2110/psv@v0.5.0"
+# with extras, e.g. the chain reader and the MCP server:
+pip install "psv[chain,mcp] @ git+https://github.com/moped2110/psv@v0.5.0"
+```
+
+For development, from a clone:
 
 ```bash
 python -m venv .venv
@@ -131,7 +144,7 @@ agent can ask for the settlement proof from inside an editor instead of
 assembling a long command line by hand.
 
 ```bash
-pip install "psv[mcp]"
+pip install "psv[mcp] @ git+https://github.com/moped2110/psv@v0.5.0"
 ```
 
 ```jsonc
