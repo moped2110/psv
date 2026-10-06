@@ -5,6 +5,25 @@ All notable changes to psv are documented here. The format loosely follows
 
 ## [Unreleased]
 
+### Security
+
+- **CI lock refreshed so `pip-audit --strict` is clean again (replaces Dependabot #13 by hand).**
+  The weekly supply-chain job on `main` was red on 21 advisories in four
+  transitive packages: `httpx2` 2.10.0 (PYSEC-2026-3846/-3848/-3849), `urllib3` 2.7.0
+  (PYSEC-2026-4175..4177), `pyjwt` 2.13.0 (PYSEC-2026-4140..4152, CVE-2026-102275) and
+  `multidict` 6.7.1 (CVE-2026-104874). Each now has a security floor in
+  `requirements/ci.in`, next to the existing `cryptography` and `aiohttp` floors, so the gate
+  cannot quietly regress. The rest of the lock was refreshed with `--upgrade` rather than by
+  raising the floors in `pyproject.toml`, which is what Dependabot proposes and what K3-1
+  declined: a floor in the `chain`/`sut` extras is a permanent constraint on every consumer,
+  and the lock reaches the same versions without one.
+  Notable moves in the lock: `web3` 7.16.0 → 8.0.0, `eth-account` 0.13.7 → 0.14.0,
+  `eth-abi` 5.2.0 → 6.0.0 (now a final release, not the beta corrected in K3-1), `mcp`
+  2.0.0 → 2.3.0, `uv` 0.12.3 → 0.12.23. `eth-account` 0.14 still exposes the private
+  `eth_account.messages._hash_eip191_message` that `psv.payloads` imports, so the
+  published floors (`web3>=7.0`, `eth-account>=0.13`) stay as they are and still resolve
+  together with x402-conformance.
+
 ## [0.3.0] — 2026-08-13
 
 ### Added
