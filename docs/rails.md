@@ -15,6 +15,7 @@ metadata is known.
 | `usdc-polygon` | Polygon 137 | USDC | 6 | `finalized` | calibrated read-only |
 | `usdc-celo` | Celo 42220 | USDC | 6 | `finalized` | calibrated read-only |
 | `usdc-celo-sepolia` | Celo Sepolia 11142220 | USDC | 6 | `finalized` | calibrated read-only |
+| `usdc-base-sepolia` | Base Sepolia 84532 | USDC | 6 | `finalized` | calibrated read-only |
 | `usdt0-flare` | Flare 14 | USD₮0 | 6 | `finalized` | calibrated read-only |
 | `jpyc-polygon` | Polygon 137 | JPYC | 18 | `finalized` | uncalibrated; fails closed |
 
@@ -24,7 +25,8 @@ decimals, interface, EIP-712 domain, and authoritative sources — all captured
 from **one** finalized block, because values from different blocks describe a
 state that never existed together. Each rail carries its own review date: the
 Base pair was reviewed 2026-07-18 at block `48,783,151`, the four newer rails on
-2026-08-13 at their own blocks.
+2026-08-13 at their own blocks, and `usdc-base-sepolia` on 2026-10-07 at block
+`47,801,036`.
 
 The EIP-712 domain is **solved, not copied**. `tools/capture_rail_attestation.py`
 reads the contract's `DOMAIN_SEPARATOR()` and reports which name/version pair
@@ -46,6 +48,25 @@ Authoritative metadata sources:
 - [JPYC contract notice](https://corporate.jpyc.co.jp/news/posts/Notice)
 - [x402 default assets](https://github.com/x402-foundation/x402/blob/main/DEFAULT_ASSETS.md) — authoritative for *which* token an x402 endpoint on a chain quotes, never for what the contract is
 - [EIP-3009](https://eips.ethereum.org/EIPS/eip-3009)
+- [x402 SDK default assets @ cb0ec5bc](https://github.com/x402-foundation/x402/blob/cb0ec5bc/python/x402/mechanisms/evm/default_assets.py) — `eip155:84532` → `0x036CbD53842c5426634e7929541eC2318f3dCF7e`, domain `USDC`/`2`, 6 decimals (the Go table at the same commit agrees)
+
+### `usdc-base-sepolia` review (2026-10-07)
+
+| Field | Value | Evidence |
+|---|---|---|
+| Token | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | Circle's USDC address table lists it for Base Sepolia; upstream x402's default-asset tables (Python and Go, `cb0ec5bc`) use it for `eip155:84532` |
+| Reviewed block | `47,801,036`, hash `0x70b0837b…a70266` | finalized block at capture time |
+| Proxy code SHA-256 | `e878b99f…996d28` | `eth_getCode` at the reviewed block |
+| Implementation | `0xd74cc5d436923b8ba2c179b4bca2841d8a52c5b5` (Circle proxy slot) | `eth_getStorageAt` at the reviewed block |
+| Implementation code SHA-256 | `9e410c49…010eba77` | `eth_getCode` at the reviewed block |
+| EIP-712 domain | `USDC` / `2` | solved from `DOMAIN_SEPARATOR()` = `0x71f17a3b…4c9818`, matches `name()`/`version()` |
+| Decimals, EIP-3009 state | `6`; `authorizationState` readable | `eth_call` |
+
+Captured with `tools/capture_rail_attestation.py --rpc https://sepolia.base.org`
+and re-captured from `https://base-sepolia-rpc.publicnode.com`; every field was
+identical at the same finalized block. `psv rail-drift --rail usdc-base-sepolia`
+matches on both endpoints. The rail shares chain id 84532 with the local
+`mock-anvil` fixture but not its token; the rail key selects the rail.
 
 ## Read-only drift check
 
@@ -58,6 +79,19 @@ and 2 on an RPC or input failure.
 psv rail-drift --rail usdc-base --rpc-url https://mainnet.base.org
 psv rail-drift --rail eurc-base --rpc-url https://mainnet.base.org
 ```
+
+```bash
+psv rail-drift --rail usdc-base-sepolia --rpc-url https://sepolia.base.org
+```
+
+**The drift check needs an archive-capable RPC.** It re-reads the token at the
+reviewed block, which for most rails is weeks or months old. Pruning nodes refuse
+that: `forno.celo-sepolia.celo-testnet.org`, for example, answers HTTP 400 with
+`block is more than 10064 blocks behind head`. Since 2026-10, psv shows the node's
+own message and an archive hint instead of a bare `HTTP Error 400`. Use an
+archive endpoint (e.g. `https://rpc.ankr.com/celo_sepolia` for Celo Sepolia, which
+matched on 2026-10-07) or your own archive node. A pruned node fails closed
+(exit 2), never with a false match.
 
 CI runs both Base observations on a schedule. The job is deliberately absent
 from pull-request gates so external RPC availability cannot make offline changes

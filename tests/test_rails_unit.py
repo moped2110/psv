@@ -69,10 +69,33 @@ def test_known_rails_have_reviewed_runtime_metadata() -> None:
     assert get_rail("usdc-polygon").attestation.calibrated is True
     assert get_rail("usdc-celo").attestation.calibrated is True
     assert get_rail("usdc-celo-sepolia").attestation.calibrated is True
+    assert get_rail("usdc-base-sepolia").attestation.calibrated is True
     assert get_rail("usdt0-flare").attestation.calibrated is True
     # The one rail still registered without on-chain evidence. It is the control:
     # if this ever flips to True without a capture, calibration has become a label.
     assert get_rail("jpyc-polygon").attestation.calibrated is False
+
+
+def test_base_sepolia_usdc_is_the_reviewed_testnet_rail() -> None:
+    # Captured 2026-10-07 with tools/capture_rail_attestation.py from sepolia.base.org
+    # and cross-checked against publicnode at the same finalized block; the address is
+    # Circle's published Base Sepolia USDC and upstream x402's eip155:84532 default.
+    rail = get_rail("usdc-base-sepolia")
+    assert rail.chain_id == 84532
+    assert rail.token_address == "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+    assert (rail.token_name, rail.token_version, rail.decimals) == ("USDC", "2", 6)
+    assert (rail.attestation.domain_name, rail.attestation.domain_version) == ("USDC", "2")
+    att = rail.attestation
+    assert att.network_class == "testnet"
+    assert att.reviewed_block_number == 47_801_036
+    assert att.expected_code_sha256 == (
+        "e878b99fc0c17354c86c7edeb999c70c18cfd925abb0958496f027cbad996d28"
+    )
+    assert att.implementation_address == "0xd74cc5d436923b8ba2c179b4bca2841d8a52c5b5"
+    assert att.reviewed_on.isoformat() == "2026-10-07"
+    assert rail.signing_enabled is False
+    # Same chain id as the local fixture, different token: never confused.
+    assert rail.token_address.lower() != get_rail("mock-anvil").token_address.lower()
 
 
 def test_eurc_is_the_reviewed_read_only_eur_rail() -> None:

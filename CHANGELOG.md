@@ -5,8 +5,37 @@ All notable changes to psv are documented here. The format loosely follows
 
 ## [Unreleased]
 
+Findings from the 2026-10-07 real-target validation.
+
+### Added
+
+- **`usdc-base-sepolia` rail** (Base Sepolia 84532, USDC
+  `0x036CbD53842c5426634e7929541eC2318f3dCF7e`), calibrated read-only. The address
+  is Circle's published Base Sepolia USDC and upstream x402's `eip155:84532`
+  default asset (Python and Go tables at `cb0ec5bc`). Code, proxy implementation,
+  implementation code and the EIP-712 domain (`USDC`/`2`, solved from
+  `DOMAIN_SEPARATOR()`) were captured with `tools/capture_rail_attestation.py` at
+  finalized block 47,801,036 from `sepolia.base.org` and re-captured identically
+  from publicnode. `psv rail-drift --rail usdc-base-sepolia` matches on both. This
+  is the asset the x402.org facilitator settles on Base Sepolia, which psv could
+  not reconcile before.
+
+### Fixed
+
+- **RPC HTTP errors hid the node's reason.** A 4xx from the RPC surfaced only as
+  `HTTP Error 400: Bad Request`. psv now appends the node's own message (JSON-RPC
+  `error.message`, or the plain body), bounded to 300 characters, stripped of
+  control characters, and scrubbed of the endpoint path and query, which may hold
+  an API key. When the message says the node cannot serve historical state, it adds
+  an archive-RPC hint. Found when `rail-drift --rail usdc-celo-sepolia` against
+  forno failed with a bare 400 whose body said `block is more than 10064 blocks
+  behind head`.
+
 ### Documented
 
+- **`rail-drift` needs an archive-capable RPC**, because it reads the rail's
+  reviewed block. Documented in `docs/rails.md`, `docs/DEVELOPER.md` and the
+  README, with a Celo Sepolia archive endpoint that matched on 2026-10-07.
 - **`docs/DEVELOPER.md`** is the developer entry point. It covers the full
   module map, install from a git tag, the hash-locked setup and Anvil, the gates,
   how scenarios, verdicts and pay outcomes work, adding a detector, scenario,
