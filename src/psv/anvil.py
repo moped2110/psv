@@ -197,6 +197,64 @@ def _redacted(endpoint: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
+#: How much of an HTTP error body is read, and how much of its message is shown.
+_MAX_ERROR_BODY_BYTES = 4096
+_MAX_ERROR_MESSAGE_CHARS = 300
+_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]+")
+#: Messages nodes use when they cannot serve the historical state psv asks for.
+_PRUNED_STATE = re.compile(
+    r"behind head|missing trie node|pruned|archive|header not found|state.*not available",
+    re.IGNORECASE,
+)
+
+
+def _http_error_detail(exc: urllib.error.HTTPError, endpoint: str) -> str:
+    """Return the server's own error message from an HTTP error response, bounded.
+
+    Providers answer a JSON-RPC request they will not serve with a 4xx whose body says
+    why (``{"error": {"message": "block is more than 10064 blocks behind head"}}``).
+    ``HTTP Error 400: Bad Request`` alone hides that, so the message is extracted,
+    stripped of control characters, length-capped and scrubbed of the endpoint (whose
+    path may carry an API key) before it is shown.
+    """
+    try:
+        raw = exc.read(_MAX_ERROR_BODY_BYTES)
+    except (OSError, ValueError):
+        return ""
+    if not raw:
+        return ""
+    text = raw.decode("utf-8", errors="replace")
+    message: str = text
+    try:
+        doc = json.loads(text)
+    except ValueError:
+        doc = None
+    if isinstance(doc, dict):
+        error = doc.get("error")
+        if isinstance(error, dict) and isinstance(error.get("message"), str):
+            message = error["message"]
+        elif isinstance(error, str):
+            message = error
+        elif isinstance(doc.get("message"), str):
+            message = doc["message"]
+    parsed = urlsplit(endpoint)
+    for secret in (endpoint, parsed.path, parsed.query):
+        if secret and secret not in {"/"}:
+            message = message.replace(secret, "<redacted>")
+    message = _CONTROL_CHARS.sub(" ", message).strip()
+    if len(message) > _MAX_ERROR_MESSAGE_CHARS:
+        message = message[:_MAX_ERROR_MESSAGE_CHARS] + "…"
+    if not message:
+        return ""
+    detail = f" — RPC said: {message}"
+    if _PRUNED_STATE.search(message):
+        detail += (
+            " (this node does not serve historical state; reads pinned to a reviewed "
+            "block, such as rail-drift, need an archive RPC)"
+        )
+    return detail
+
+
 class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
     """Refuse every redirect on the chain-truth transport.
 
@@ -248,6 +306,11 @@ def _urllib_transport(endpoint: str, timeout: float) -> Transport:
         try:
             with opener.open(req, timeout=timeout) as resp:  # noqa: S310
                 raw = resp.read(_MAX_RPC_RESPONSE_BYTES + 1)
+        except urllib.error.HTTPError as exc:
+            raise RpcError(
+                f"transport failure contacting {_redacted(endpoint)}: {exc}"
+                f"{_http_error_detail(exc, endpoint)}"
+            ) from exc
         except (urllib.error.URLError, OSError, TimeoutError) as exc:
             raise RpcError(f"transport failure contacting {_redacted(endpoint)}: {exc}") from exc
         if len(raw) > _MAX_RPC_RESPONSE_BYTES:
