@@ -175,6 +175,8 @@ _REVIEWED = date(2026, 7, 18)
 _REVIEWED_2026_08_13 = date(2026, 8, 13)
 _ATTESTATION_VERSION = "2026-07-18.2"
 _ATTESTATION_VERSION_2026_08_13 = "2026-08-13.1"
+_REVIEWED_2026_10_07 = date(2026, 10, 7)
+_ATTESTATION_VERSION_2026_10_07 = "2026-10-07.1"
 _CIRCLE_USDC = "https://developers.circle.com/stablecoins/usdc-contract-addresses"
 _CIRCLE_EURC = "https://developers.circle.com/stablecoins/eurc-contract-addresses"
 _JPYC_NOTICE = "https://corporate.jpyc.co.jp/news/posts/Notice"
@@ -190,6 +192,16 @@ _POLYGON_RPC = "https://polygon.drpc.org"
 _X402_DEFAULT_ASSETS = "https://github.com/x402-foundation/x402/blob/main/DEFAULT_ASSETS.md"
 _CELO_RPC = "https://forno.celo.org"
 _CELO_SEPOLIA_RPC = "https://forno.celo-sepolia.celo-testnet.org"
+# The Base Sepolia attestation was captured from Base's public endpoint and
+# cross-checked, field for field at the same finalized block, against publicnode.
+_BASE_SEPOLIA_RPC = "https://sepolia.base.org"
+# The upstream SDK default-asset table, pinned to the reviewed upstream commit: it is
+# what the x402.org facilitator's Base Sepolia endpoints quote (eip155:84532 → this
+# USDC, domain USDC/2, 6 decimals).
+_X402_DEFAULT_ASSETS_BASE_SEPOLIA = (
+    "https://github.com/x402-foundation/x402/blob/cb0ec5bc/"
+    "python/x402/mechanisms/evm/default_assets.py"
+)
 _FLARE_RPC = "https://flare-api.flare.network/ext/C/rpc"
 
 #: Circle's FiatTokenProxy implementation slot ("org.zeppelinos.proxy.implementation").
@@ -430,6 +442,43 @@ KNOWN_RAILS: dict[str, RailConfig] = {
             ),
             reviewed_on=_REVIEWED_2026_08_13,
             version=_ATTESTATION_VERSION_2026_08_13,
+        ),
+    ),
+    # Base Sepolia (84532) testnet USDC, the asset the x402.org facilitator settles in
+    # its Base Sepolia flow. Shares its chain id with `mock-anvil` (a local fork of the
+    # same chain id) but not its token: the rail key, not the chain id, selects a rail.
+    "usdc-base-sepolia": RailConfig(
+        "usdc-base-sepolia",
+        "USDC on Base Sepolia",
+        84532,
+        "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+        6,
+        "USDC",
+        "2",
+        FinalityPolicy("finalized", 1),
+        _attestation(
+            sources=(
+                _CIRCLE_USDC,
+                _EIP_3009,
+                _X402_DEFAULT_ASSETS_BASE_SEPOLIA,
+                _BASE_SEPOLIA_RPC,
+            ),
+            network_class="testnet",
+            proxy_kind="fiat-token-proxy",
+            decimals=6,
+            domain_name="USDC",
+            domain_version="2",
+            calibrated=True,
+            reviewed_block_number=47_801_036,
+            reviewed_block_hash="0x70b0837b92f7f71dc81194899b23c18ee6332c74464b8da42c359a9a4ba70266",
+            expected_code_sha256="e878b99fc0c17354c86c7edeb999c70c18cfd925abb0958496f027cbad996d28",
+            implementation_address="0xd74cc5d436923b8ba2c179b4bca2841d8a52c5b5",
+            proxy_implementation_slot=_CIRCLE_PROXY_SLOT,
+            implementation_code_sha256=(
+                "9e410c49b2c8f98e4924d5cab8f07e734625c650c940a7ed600b376f010eba77"
+            ),
+            reviewed_on=_REVIEWED_2026_10_07,
+            version=_ATTESTATION_VERSION_2026_10_07,
         ),
     ),
     "usdt0-flare": RailConfig(

@@ -141,7 +141,12 @@ Rail drift can be checked without moving value:
 
 ```bash
 psv rail-drift --rail usdc-base --rpc-url https://mainnet.base.org
+psv rail-drift --rail usdc-base-sepolia --rpc-url https://sepolia.base.org
 ```
+
+The drift check reads the rail's reviewed block, so it needs an archive-capable
+RPC; a pruning node fails closed with its own error message (see
+[`docs/rails.md`](docs/rails.md#read-only-drift-check)).
 
 ## MCP server (for coding agents)
 

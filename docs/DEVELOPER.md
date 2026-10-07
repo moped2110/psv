@@ -149,6 +149,11 @@ deltas never prove a payment ([architecture.md](architecture.md#atomic-chain-evi
 | `1` | drift or uncalibrated rail |
 | `2` | RPC or input failure |
 
+`rail-drift` reads the token at the rail's reviewed block, so it needs an
+**archive-capable RPC**. A pruning node rejects the historical read (often HTTP
+400 or "missing trie node"); psv then prints the node's message with an archive
+hint and exits 2. See [`rails.md`](rails.md#read-only-drift-check).
+
 **Pay outcomes.** Since v0.5.0, `PayResult.outcome` maps a pay answer to
 `settled`, `pending` or `unsettled`. `pending` means the answer carries x402's
 non-terminal `settlement_pending` *and* names the broadcast transaction. Such an
